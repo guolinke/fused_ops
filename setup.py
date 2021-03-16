@@ -110,6 +110,26 @@ ext_modules.append(
                     extra_compile_args={'cxx': ['-O3'] + version_dependent_macros,
                                         'nvcc':['-O3'] + version_dependent_macros}))
 
+generator_flag = []
+torch_dir = torch.__path__[0]
+if os.path.exists(os.path.join(torch_dir, 'include', 'ATen', 'CUDAGenerator.h')):
+    generator_flag = ['-DOLD_GENERATOR']
+
+ext_modules.append(
+    CUDAExtension(name='fused_softmax_dropout_cuda',
+                    sources=['csrc/softmax_dropout/interface.cpp',
+                            'csrc/softmax_dropout/softmax_dropout_kernel.cu'],
+                    include_dirs=[os.path.join(this_dir, 'csrc')],
+                    extra_compile_args={'cxx': ['-O3',] + version_dependent_macros + generator_flag,
+                                        'nvcc':['-O3',
+                                                '-gencode', 'arch=compute_70,code=sm_70',
+                                                '-gencode', 'arch=compute_80,code=sm_80',
+                                                '-U__CUDA_NO_HALF_OPERATORS__',
+                                                '-U__CUDA_NO_HALF_CONVERSIONS__',
+                                                '--expt-relaxed-constexpr',
+                                                '--expt-extended-lambda',
+                                                '--use_fast_math'] + version_dependent_macros + generator_flag}))
+
 
 setup(
     name='fused_ops',
