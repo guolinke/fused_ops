@@ -621,97 +621,13 @@ std::vector<Tensor> host_bf16_softmax_xentropy(
   return ret;
 }
 
-// BF16
-template<template<typename, typename, typename> class Epilogue>
-Tensor host_bf16_softmax_xentropy_backward(
-    const at::Tensor &grad_loss,
-    const at::Tensor &logits_,
-    const at::Tensor &max_log_sum_exp,
-    const at::Tensor &labels,
-    bool bf16_to_float) {
-  const int64_t dim = 1;
-  Tensor gI = at::empty_like(logits_);
-  if (grad_loss.numel() == 0) {
-    return gI;
-  }
-
-  auto grad = grad_loss.contiguous();
-  auto logits = logits_.contiguous();
-
-  static_assert(std::is_same<acc_type<at::BFloat16, true>, float>::value ||
-    std::is_same<acc_type<at::BFloat16, true>, double>::value,
-    "accscalar_t for bf16 should be float or double");
-  if (grad.dim() == 0) grad = grad.view(1);
-
-  AT_ASSERTM(logits_.dim() == 2, "Currently only 2 dim input supported");
-  AT_ASSERTM(labels.dim() == 1, "Labels should be 1 dimensional");
-  AT_ASSERTM(logits_.numel() > 0, "Number of classes in input should not be 0");
-  AT_ASSERTM(logits_.size(0) == labels.size(0), "Input and label should have same number of examples");
-  AT_ASSERTM(labels.size(0) == grad.size(0), "Label and loss should have same number of examples");
-
-  int64_t outer_size = 1;
-  int64_t dim_size = logits.size(dim);
-  int64_t inner_size = 1;
-  for (int64_t i = 0; i < dim; ++i)
-    outer_size *= logits.size(i);
-  for (int64_t i = dim + 1; i < logits.dim(); ++i)
-    inner_size *= logits.size(i);
-  // See descriptions of kernels above.
-  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
-  TORCH_CHECK(inner_size == 1, "Currently only inner size 1 supported");
-
-  dim3 grid(outer_size);
-
-  DISPATCH_FLOAT_AND_BF16(gI.scalar_type(), 0, "host_bf16_softmax_xentropy_backward",
-    using accscalar_t = acc_type<scalar_t_0, true>;
-    const int ILP = sizeof(float4)/sizeof(scalar_t_0);
-    dim3 block = SoftMax_getBlockSize(ILP, dim_size);
-    if (!bf16_to_float) {
-      cunn_SoftMaxXEntropyBackward<ILP, scalar_t_0, accscalar_t, scalar_t_0, Epilogue>
-       <<<grid, block, block.x * sizeof(accscalar_t), stream>>>(
-          gI.DATA_PTR<scalar_t_0>(), logits.DATA_PTR<scalar_t_0>(),
-          max_log_sum_exp.DATA_PTR<scalar_t_0>(),
-          grad.DATA_PTR<scalar_t_0>(), labels.DATA_PTR<int64_t>(),
-          dim_size
-      );
-    } else {
-      cunn_SoftMaxXEntropyBackward<ILP, scalar_t_0, accscalar_t, accscalar_t, Epilogue>
-       <<<grid, block, block.x * sizeof(accscalar_t), stream>>>(
-          gI.DATA_PTR<scalar_t_0>(), logits.DATA_PTR<scalar_t_0>(),
-          max_log_sum_exp.DATA_PTR<accscalar_t>(),
-          grad.DATA_PTR<accscalar_t>(), labels.DATA_PTR<int64_t>(),
-          dim_size
-      );
-    }
-  );
-
-  THCudaCheck(cudaGetLastError());
-  return gI;
-}
-
-std::vector<Tensor> bf16_softmax_xentropy_cuda(const Tensor &input, const Tensor &labels, const bool bf16_to_float){
-  return host_bf16_softmax_xentropy<LogSoftMaxForwardEpilogue>(input, labels, bf16_to_float);
-}
-
-at::Tensor bf16_softmax_xentropy_backward_cuda(
-    const at::Tensor &grad_loss,
-    const at::Tensor &logits,
-    const at::Tensor &max_log_sum_exp,
-    const at::Tensor &labels) {
-  bool bf16_to_float = grad_loss.type().scalarType() != logits.type().scalarType();
-  if (bf16_to_float) {
-     AT_ASSERTM((grad_loss.type().scalarType() == ScalarType::Float && logits.type().scalarType() == ScalarType::BFloat16), "expected input and grad types to match, or input to be at::BFloat16 and grad to be at::Float");
-  }
-  return host_bf16_softmax_xentropy_backward<LogSoftMaxBackwardEpilogue>(grad_loss, logits, max_log_sum_exp, labels, bf16_to_float);
-}
-
-// FP16
 template<template<typename, typename, typename> class Epilogue>
 std::vector<Tensor> host_softmax_xentropy(
         const Tensor & input_,
         const Tensor & labels_,
         const bool half_to_float){
-  if (half_to_float) AT_ASSERTM(input_.type().scalarType() == ScalarType::Half,"conversion is supported for half type only");
+  if (half_to_float) AT_ASSERTM(input_.type().scalarType() == ScalarType::Half
+    || input_.type().scalarType() == ScalarType::BFloat16,"conversion is supported for half or BFloat16 type only");
   AT_ASSERTM(labels_.type().scalarType() == ScalarType::Long,"Label type should be CUDA Long");
 
   auto input = input_.contiguous();
@@ -721,6 +637,10 @@ std::vector<Tensor> host_softmax_xentropy(
   static_assert(std::is_same<acc_type<at::Half, true>, float>::value ||
     std::is_same<acc_type<at::Half, true>, double>::value,
     "accscalar_t for half should be float or double");
+  static_assert(std::is_same<acc_type<at::BFloat16, true>, float>::value ||
+    std::is_same<acc_type<at::BFloat16, true>, double>::value,
+    "accscalar_t for BFloat16 should be float or double");
+
   AT_ASSERTM(input.dim() == 2, "Currently only 2 dim input supported");
   AT_ASSERTM(labels_.dim() == 1, "Labels should be 1 dimensional");
   AT_ASSERTM(input.size(0) == labels_.size(0), "Input and label should have same number of examples");
@@ -742,7 +662,7 @@ std::vector<Tensor> host_softmax_xentropy(
   dim3 grid(outer_size);
 
   using namespace at;
-  DISPATCH_FLOAT_AND_HALF(input.scalar_type(), 0, "host_softmax_xentropy",
+  DISPATCH_FLOAT_AND_HALF_AND_BF16(input.scalar_type(), 0, "host_softmax_xentropy",
     using accscalar_t = at::acc_type<scalar_t_0, true>;
     const int ILP = sizeof(float4)/sizeof(scalar_t_0);
     dim3 block = SoftMax_getBlockSize(ILP, dim_size);
@@ -788,6 +708,11 @@ Tensor host_softmax_xentropy_backward(
   static_assert(std::is_same<acc_type<at::Half, true>, float>::value ||
     std::is_same<acc_type<at::Half, true>, double>::value,
     "accscalar_t for half should be float or double");
+
+  static_assert(std::is_same<acc_type<at::BFloat16, true>, float>::value ||
+    std::is_same<acc_type<at::BFloat16, true>, double>::value,
+    "accscalar_t for BFloat16 should be float or double");
+
   if (grad.dim() == 0) grad = grad.view(1);
 
   AT_ASSERTM(logits_.dim() == 2, "Currently only 2 dim input supported");
@@ -809,7 +734,7 @@ Tensor host_softmax_xentropy_backward(
 
   dim3 grid(outer_size);
 
-  DISPATCH_FLOAT_AND_HALF(gI.scalar_type(), 0, "host_softmax_xentropy_backward",
+  DISPATCH_FLOAT_AND_HALF_AND_BF16(gI.scalar_type(), 0, "host_softmax_xentropy_backward",
     using accscalar_t = acc_type<scalar_t_0, true>;
     const int ILP = sizeof(float4)/sizeof(scalar_t_0);
     dim3 block = SoftMax_getBlockSize(ILP, dim_size);
@@ -847,7 +772,8 @@ at::Tensor softmax_xentropy_backward_cuda(
     const at::Tensor &labels) {
   bool half_to_float = grad_loss.type().scalarType() != logits.type().scalarType();
   if (half_to_float) {
-     AT_ASSERTM((grad_loss.type().scalarType() == ScalarType::Float && logits.type().scalarType() == ScalarType::Half), "expected input and grad types to match, or input to be at::half and grad to be at::Float");
+     AT_ASSERTM((grad_loss.type().scalarType() == ScalarType::Float && (logits.type().scalarType() == ScalarType::Half || logits.type().scalarType() == ScalarType::BFloat16)),
+      "expected input and grad types to match, or input to be at::half and grad to be at::Float");
   }
   return host_softmax_xentropy_backward<LogSoftMaxBackwardEpilogue>(grad_loss, logits, max_log_sum_exp, labels, half_to_float);
 }

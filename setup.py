@@ -102,14 +102,6 @@ ext_modules.append(
                     extra_compile_args={'cxx': ['-O3'] + version_dependent_macros,
                                         'nvcc':['-O3'] + version_dependent_macros}))
 
-ext_modules.append(
-    CUDAExtension(name='bf16_fused_xentropy_cuda',
-                    sources=['csrc/xentropy/bf16_interface.cpp',
-                            'csrc/xentropy/xentropy_kernel.cu'],
-                    include_dirs=[os.path.join(this_dir, 'csrc')],
-                    extra_compile_args={'cxx': ['-O3'] + version_dependent_macros,
-                                        'nvcc':['-O3'] + version_dependent_macros}))
-
 
 setup(
     name='fused_ops',
