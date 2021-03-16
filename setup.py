@@ -125,7 +125,9 @@ ext_modules.append(
                                                 '-gencode', 'arch=compute_70,code=sm_70',
                                                 '-gencode', 'arch=compute_80,code=sm_80',
                                                 '-U__CUDA_NO_HALF_OPERATORS__',
+                                                '-U__CUDA_NO_BFLOAT16_OPERATORS__',
                                                 '-U__CUDA_NO_HALF_CONVERSIONS__',
+                                                '-U__CUDA_NO_BFLOAT16_CONVERSIONS__',
                                                 '--expt-relaxed-constexpr',
                                                 '--expt-extended-lambda',
                                                 '--use_fast_math'] + version_dependent_macros + generator_flag}))
