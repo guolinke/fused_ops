@@ -102,6 +102,14 @@ ext_modules.append(
                     extra_compile_args={'cxx': ['-O3'] + version_dependent_macros,
                                         'nvcc':['-O3'] + version_dependent_macros}))
 
+ext_modules.append(
+    CUDAExtension(name='fused_layernorm_cuda',
+                    sources=['csrc/layernorm/interface.cpp',
+                            'csrc/layernorm/layernorm_kernel.cu'],
+                    include_dirs=[os.path.join(this_dir, 'csrc')],
+                    extra_compile_args={'cxx': ['-O3'] + version_dependent_macros,
+                                        'nvcc':['-O3'] + version_dependent_macros}))
+
 
 setup(
     name='fused_ops',
