@@ -14,7 +14,6 @@
 template <typename T, typename GRAD_T>
 __global__ void adam_cuda_kernel(
     T* __restrict__ p,
-    GRAD_T* __restrict__ p_copy, // For mixed precision training, pass NULL if not needed
     T* __restrict__ m,
     T* __restrict__ v,
     const GRAD_T * __restrict__ g,
@@ -39,17 +38,13 @@ __global__ void adam_cuda_kernel(
         T scaled_grad = static_cast<T>(g[j]) / grad_scale;
         m[j] = b1*m[j] + (1-b1)*scaled_grad;
         v[j] = b2*v[j] + (1-b2)*scaled_grad*scaled_grad;
-        const float update = (m[j] / (sqrtf(v[j]) + eps));
+        const float update = m[j] / (sqrtf(v[j]) + eps);
         p[j] = p[j] - (step_size*update);
-        if (p_copy != NULL) {
-            p_copy[j] = (GRAD_T) p[j];
-         }
     }
 }
 
 void fused_adam_cuda(
     at::Tensor & p,
-    at::Tensor & p_copy,
     at::Tensor & m,
     at::Tensor & v,
     at::Tensor & g,
@@ -88,7 +83,6 @@ void fused_adam_cuda(
             using accscalar_t = at::acc_type<scalar_t_0, true>;
             adam_cuda_kernel<accscalar_t, scalar_t_0><<<blocks,threadsPerBlock, 0, stream>>>(
                     p.DATA_PTR<accscalar_t>(),
-                    p_copy.numel() ? p_copy.DATA_PTR<scalar_t_0>() : NULL,
                     m.DATA_PTR<accscalar_t>(),
                     v.DATA_PTR<accscalar_t>(),
                     g.DATA_PTR<scalar_t_0>(),
@@ -105,7 +99,6 @@ void fused_adam_cuda(
         DISPATCH_DOUBLE_AND_FLOAT(g.scalar_type(), 0, "adam_cuda_kernel",
             adam_cuda_kernel<scalar_t_0, scalar_t_0><<<blocks,threadsPerBlock, 0, stream>>>(
                     p.DATA_PTR<scalar_t_0>(),
-                    NULL, //don't output p_copy for fp32, it's wasted write
                     m.DATA_PTR<scalar_t_0>(),
                     v.DATA_PTR<scalar_t_0>(),
                     g.DATA_PTR<scalar_t_0>(),
