@@ -108,6 +108,14 @@ ext_modules.append(
                             'csrc/layernorm/layernorm_kernel.cu'],
                     include_dirs=[os.path.join(this_dir, 'csrc')],
                     extra_compile_args={'cxx': ['-O3'] + version_dependent_macros,
+                                        'nvcc':['-maxrregcount=50', '-O3'] + version_dependent_macros}))
+
+ext_modules.append(
+    CUDAExtension(name='fused_adam_cuda_v2',
+                    sources=['csrc/adam/interface.cpp',
+                            'csrc/adam/adam_kernel.cu'],
+                    include_dirs=[os.path.join(this_dir, 'csrc')],
+                    extra_compile_args={'cxx': ['-O3'] + version_dependent_macros,
                                         'nvcc':['-O3'] + version_dependent_macros}))
 
 generator_flag = []
@@ -129,8 +137,7 @@ ext_modules.append(
                                                 '-U__CUDA_NO_HALF_CONVERSIONS__',
                                                 '-U__CUDA_NO_BFLOAT16_CONVERSIONS__',
                                                 '--expt-relaxed-constexpr',
-                                                '--expt-extended-lambda',
-                                                '--use_fast_math'] + version_dependent_macros + generator_flag}))
+                                                '--expt-extended-lambda'] + version_dependent_macros + generator_flag}))
 
 
 setup(
