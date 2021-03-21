@@ -21,19 +21,6 @@ namespace {
     template <>
     __device__ __inline__ void copy_vector<float, 1>(float *dst, const float *src) { *dst = *src; }
  
-    template <typename Datatype, int ELEMENTS_PER_LDG>
-    __device__ __inline__ void apply_mask(Datatype *dst, Datatype value, const uint8_t *src);
-    
-    template <>
-    __device__ __inline__ void apply_mask<__half, 1>(__half *dst, __half value, const uint8_t *src) {
-      if (*src == 1) { *dst = value; }
-    }
-
-    template <>
-    __device__ __inline__ void apply_mask<__nv_bfloat16, 1>(__nv_bfloat16 *dst, __nv_bfloat16 value, const uint8_t *src) {
-      if (*src == 1) { *dst = value; }
-    }
- 
 } // namespace anonymous
  
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
