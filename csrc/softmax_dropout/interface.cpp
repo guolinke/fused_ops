@@ -30,7 +30,7 @@ std::vector<torch::Tensor> fwd(
                                                  )
 {
   AT_ASSERTM(input.dim() == 3, "expected 3D tensor");
-  AT_ASSERTM(input.type().scalarType() == at::ScalarType::Half || input.type().scalarType() == at::ScalarType::BFloat16 , "Only HALF/BFloat16 is supported");
+  AT_ASSERTM(input.type().scalarType() == at::ScalarType::Half || input.type().scalarType() == at::ScalarType::BFloat16 || input.type().scalarType() == at::ScalarType::Float, "Only HALF/BFloat16/Float is supported");
 
 
   return fwd_cuda(
@@ -52,8 +52,8 @@ torch::Tensor bwd(int heads,
   AT_ASSERTM(softmax_results.dim()   == 3, "expected 3D tensor");
   AT_ASSERTM(dropout_mask.dim()      == 3, "expected 3D tensor");
 
-  AT_ASSERTM(output_grads.type().scalarType()      == at::ScalarType::Half || output_grads.type().scalarType()      == at::ScalarType::BFloat16, "Only HALF/BFloat16 is supported");
-  AT_ASSERTM(softmax_results.type().scalarType()   == at::ScalarType::Half || softmax_results.type().scalarType()   == at::ScalarType::BFloat16, "Only HALF/BFloat16 is supported");
+  AT_ASSERTM(output_grads.type().scalarType()      == at::ScalarType::Half || output_grads.type().scalarType()      == at::ScalarType::BFloat16 || output_grads.type().scalarType()      == at::ScalarType::Float, "Only HALF/BFloat16/Float is supported");
+  AT_ASSERTM(softmax_results.type().scalarType()   == at::ScalarType::Half || softmax_results.type().scalarType()   == at::ScalarType::BFloat16 || softmax_results.type().scalarType()   == at::ScalarType::Float, "Only HALF/BFloat16/Float is supported");
 
   return bwd_cuda(
                 heads,

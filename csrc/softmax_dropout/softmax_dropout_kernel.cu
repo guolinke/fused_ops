@@ -64,7 +64,14 @@ std::vector<torch::Tensor> fwd_cuda(
                                 k_seq_len,
                                 k_seq_len,
                                 attn_batches*q_seq_len);
-  } else{
+  } else if (input.type().scalarType() == at::ScalarType::Float){
+    softmax_success = dispatch_softmax<float, float, float>(
+                                reinterpret_cast<float*>(softmax_results_ptr),
+                                reinterpret_cast<const float*>(input_ptr),
+                                k_seq_len,
+                                k_seq_len,
+                                attn_batches*q_seq_len);
+  } else {
       softmax_success = false;
   }
 
@@ -124,6 +131,16 @@ torch::Tensor bwd_cuda(
                             static_cast<half*>(output_grads.data_ptr()), 
                             static_cast<half*>(output_grads.data_ptr()), 
                             reinterpret_cast<half const*>(softmax_results.data_ptr()),
+                            static_cast<uint8_t const*>(dropout_mask.data_ptr()),
+                            1.0/(1.0-dropout_prob),
+                            k_seq_len,
+                            k_seq_len,
+                            attn_batches*q_seq_len);
+  } else if (softmax_results.type().scalarType() == at::ScalarType::Float){
+    dispatch_masked_scale_softmax_backward<float, float, float, false>(
+                            static_cast<float*>(output_grads.data_ptr()), 
+                            static_cast<float*>(output_grads.data_ptr()), 
+                            reinterpret_cast<float const*>(softmax_results.data_ptr()),
                             static_cast<uint8_t const*>(dropout_mask.data_ptr()),
                             1.0/(1.0-dropout_prob),
                             k_seq_len,
