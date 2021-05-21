@@ -139,6 +139,21 @@ ext_modules.append(
                                                 '--expt-relaxed-constexpr',
                                                 '--expt-extended-lambda'] + version_dependent_macros + generator_flag}))
 
+ext_modules.append(
+    CUDAExtension(name='fused_softmax_dropout_fast_cuda',
+                    sources=['csrc/softmax_dropout_fast/interface.cpp',
+                            'csrc/softmax_dropout_fast/softmax_dropout_kernel.cu'],
+                    include_dirs=[os.path.join(this_dir, 'csrc')],
+                    extra_compile_args={'cxx': ['-O3',] + version_dependent_macros + generator_flag,
+                                        'nvcc':['-O3', '-lineinfo', '--use_fast_math',
+                                                '-gencode', 'arch=compute_70,code=sm_70',
+                                                '-gencode', 'arch=compute_80,code=sm_80',
+                                                '-U__CUDA_NO_HALF_OPERATORS__',
+                                                '-U__CUDA_NO_BFLOAT16_OPERATORS__',
+                                                '-U__CUDA_NO_HALF_CONVERSIONS__',
+                                                '-U__CUDA_NO_BFLOAT16_CONVERSIONS__',
+                                                '--expt-relaxed-constexpr',
+                                                '--expt-extended-lambda'] + version_dependent_macros + generator_flag}))
 
 setup(
     name='fused_ops',
