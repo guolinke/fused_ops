@@ -50,19 +50,28 @@ void generate_dropout_mask(MaskType* mask, int bsz, int dim, float p, uint64_t s
     generate_dropout_mask_kernel<MaskType, float, size_t><<<grid, block_size>>>(mask, num_elements, seed, offset, p);
 }
 
+template <typename T>
+__device__ __forceinline__ T from_uint8(uint8_t input) {
+    return (T)input;
+}
+
+template <>
+__device__ __forceinline__ __nv_bfloat16 from_uint8(uint8_t input) {
+    return (__nv_bfloat16)(float)input;
+}
+
 template <typename index_t, typename input_t, typename output_t, bool is_training>
 __global__ void bias_dropout_add_forward(output_t *dst, const input_t *x, const input_t *bias,
-    const input_t *residual, const uint8_t *mask, index_t bsz, int dim, float p) {
+    const input_t *residual, const uint8_t *mask, index_t bsz, int dim, input_t pinv) {
     if IF_CONSTEXPR (is_training) {
-        float pinv = 1 / p;
         int mask_index = blockIdx.x * CELL(dim, 8);
         uint8_t mask_offset = threadIdx.x % 8;
         for (int j = threadIdx.x; j < dim; j += blockDim.x) {
             if (blockIdx.x < bsz) {
                 index_t idx = blockIdx.x * dim + j;
                 input_t y = x[idx] + bias[j];
-                float m = (float)((mask[mask_index + j / 8] & (1 << mask_offset)) >> mask_offset);
-                dst[idx] = y * (input_t)(m * pinv) + residual[idx];
+                input_t m = from_uint8<input_t>(((mask[mask_index + j / 8] & (1 << mask_offset)) >> mask_offset));
+                dst[idx] = y * m * pinv + residual[idx];
             }
         }
     } else {
@@ -73,16 +82,6 @@ __global__ void bias_dropout_add_forward(output_t *dst, const input_t *x, const 
             }
         }
     }
-}
-
-template <typename T>
-__device__ __forceinline__ T from_uint8(uint8_t input) {
-    return (T)input;
-}
-
-template <>
-__device__ __forceinline__ __nv_bfloat16 from_uint8(uint8_t input) {
-    return (__nv_bfloat16)(float)input;
 }
 
 template <typename index_t, typename input_t, typename output_t>
@@ -134,7 +133,7 @@ std::vector<torch::Tensor> bias_dropout_add_forward_cuda(const torch::Tensor &x,
                 (const uint8_t *)mask.data_ptr(),
                 bsz,
                 dim,
-                1.0 - dropout_prob);
+                1.0 / (1.0 - dropout_prob));
         } else if (type == at::ScalarType::Half) {
             bias_dropout_add_forward<size_t, half, half, true><<<bsz, ThreadsPerBlock, 0, stream>>>(
                 (half *)results.data_ptr(),
@@ -144,7 +143,7 @@ std::vector<torch::Tensor> bias_dropout_add_forward_cuda(const torch::Tensor &x,
                 (const uint8_t *)mask.data_ptr(),
                 bsz,
                 dim,
-                1.0 - dropout_prob);
+                1.0 / (1.0 - dropout_prob));
         } else if (type == at::ScalarType::Float) {
             bias_dropout_add_forward<size_t, float, float, true><<<bsz, ThreadsPerBlock, 0, stream>>>(
                 (float *)results.data_ptr(),
@@ -154,7 +153,7 @@ std::vector<torch::Tensor> bias_dropout_add_forward_cuda(const torch::Tensor &x,
                 (const uint8_t *)mask.data_ptr(),
                 bsz,
                 dim,
-                1.0 - dropout_prob);
+                1.0 / (1.0 - dropout_prob));
         }
     } else {
         if (type == at::ScalarType::BFloat16) {
