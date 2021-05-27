@@ -11,7 +11,10 @@ class BiasDropoutAddFunction(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad_output):
         mask, = ctx.saved_tensors
-        grad_input = fused_bias_dropout_add_cuda.backward(grad_output, mask)
+        if mask is None:
+            grad_input = grad_output
+        else:
+            grad_input = fused_bias_dropout_add_cuda.backward(grad_output, mask)
         if len(grad_input.size()) > 1:
             sizes = grad_input.size()
             grad_input_bias = grad_input.view(-1, sizes[-1]).sum(dim=0)

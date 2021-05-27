@@ -3,11 +3,11 @@
 #include <ATen/CUDAGeneratorImpl.h>
 #include <vector>
 
-std::vector<torch::Tensor> bias_dropout_add_forward_cuda(const torch::Tensor &x, const torch::Tensor &bias,
+std::vector<c10::optional<torch::Tensor>> bias_dropout_add_forward_cuda(const torch::Tensor &x, const torch::Tensor &bias,
     const torch::Tensor &residual, bool is_training, float dropout_prob, c10::optional<at::Generator> gen_);
 torch::Tensor bias_dropout_add_backward_cuda(const torch::Tensor &grad, const torch::Tensor &mask);
 
-std::vector<torch::Tensor> bias_dropout_add_forward(const torch::Tensor &x, const torch::Tensor &bias,
+std::vector<c10::optional<torch::Tensor>> bias_dropout_add_forward(const torch::Tensor &x, const torch::Tensor &bias,
     const torch::Tensor &residual, bool is_training, float dropout_prob, c10::optional<at::Generator> gen_) {
     AT_ASSERTM(x.is_contiguous() && residual.is_contiguous(), "input must be contiguous");
     AT_ASSERTM(bias.dim() == 1, "expected 1D tensor");

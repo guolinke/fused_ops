@@ -3,7 +3,7 @@
 #include <ATen/CUDAGeneratorImpl.h>
 #include <vector>
 
-std::vector<torch::Tensor> fwd_cuda(
+std::vector<c10::optional<torch::Tensor>> fwd_cuda(
                                bool                 is_training,
                                int                  heads,
                                torch::Tensor const& input, 
@@ -15,7 +15,7 @@ torch::Tensor bwd_cuda(
                         int heads,
                         torch::Tensor const& output_grads,
                         torch::Tensor const& softmax_results,
-                        torch::Tensor const& dropout_mask,
+                        c10::optional<torch::Tensor> const& dropout_mask,
                         float                dropout_prob
                                                   );
 
@@ -25,7 +25,7 @@ torch::Tensor bwd_cuda(
 #define CHECK_CONTIGUOUS(x) AT_ASSERTM(x.is_contiguous(), #x " must be contiguous")
 #define CHECK_INPUT(x) CHECK_CUDA(x); CHECK_CONTIGUOUS(x)
 
-std::vector<torch::Tensor> fwd(
+std::vector<c10::optional<torch::Tensor>> fwd(
                                bool                 is_training,
                                int                  heads,
                                torch::Tensor const& input,
@@ -49,13 +49,13 @@ std::vector<torch::Tensor> fwd(
 torch::Tensor bwd(int heads,
                 torch::Tensor const& output_grads, 
                 torch::Tensor const& softmax_results,
-                torch::Tensor const& dropout_mask,
+                c10::optional<torch::Tensor> const& dropout_mask,
                 float                dropout_prob
                                                   )
 {
   AT_ASSERTM(output_grads.dim()      == 3, "expected 3D tensor");
   AT_ASSERTM(softmax_results.dim()   == 3, "expected 3D tensor");
-  AT_ASSERTM(dropout_mask.dim()      == 1, "expected 1D tensor");
+  AT_ASSERTM(!dropout_mask || dropout_mask->dim()      == 1, "expected 1D tensor");
 
   AT_ASSERTM(output_grads.scalar_type()      == at::ScalarType::Half || output_grads.scalar_type()      == at::ScalarType::BFloat16 || output_grads.scalar_type()      == at::ScalarType::Float, "Only HALF/BFloat16/Float is supported");
   AT_ASSERTM(softmax_results.scalar_type()   == at::ScalarType::Half || softmax_results.scalar_type()   == at::ScalarType::BFloat16 || softmax_results.scalar_type()   == at::ScalarType::Float, "Only HALF/BFloat16/Float is supported");
