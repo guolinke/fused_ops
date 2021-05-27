@@ -277,7 +277,7 @@ template<typename input_t, typename output_t, typename acc_t, bool need_mask>
 bool dispatch_softmax_forward(output_t *dst, output_t *dst_orig, const input_t *src, void *mask, acc_t p,
     int softmax_elements, int softmax_elements_stride, int batch_count, uint64_t seed, uint64_t offset)
 {
-    TORCH_INTERNAL_ASSERT( softmax_elements >= 0 && softmax_elements <= 1024 );
+    TORCH_INTERNAL_ASSERT( softmax_elements >= 0 && softmax_elements <= 2048 );
     if (softmax_elements == 0) {
        return false;
     } else {
@@ -353,6 +353,11 @@ bool dispatch_softmax_forward(output_t *dst, output_t *dst_orig, const input_t *
                 softmax_warp_forward<input_t, output_t, acc_t, 1,32,32, need_mask>
                     <<<blocks, threads, 0, at::cuda::getCurrentCUDAStream()>>>(dst, dst_orig, src,
                         (uint32_t *)mask, p, batch_count, softmax_elements_stride, softmax_elements, seed, offset);
+                return true;
+            case 11: // 2048
+                softmax_warp_forward<input_t, output_t, acc_t, 1,64,32, need_mask>
+                    <<<blocks, threads, 0, at::cuda::getCurrentCUDAStream()>>>(dst, dst_orig, src,
+                        (uint64_t *)mask, p, batch_count, softmax_elements_stride, softmax_elements, seed, offset);
                 return true;
             default:
                 return false;
@@ -459,7 +464,7 @@ template<typename input_t, typename output_t, typename acc_t, bool is_log_softma
 void dispatch_softmax_backward(output_t *grad_input, const input_t *grad, const input_t *output,
     const void *mask, acc_t p, int softmax_elements, int softmax_elements_stride, int batch_count)
 {
-    TORCH_INTERNAL_ASSERT( softmax_elements >= 0 && softmax_elements <= 1024 );
+    TORCH_INTERNAL_ASSERT( softmax_elements >= 0 && softmax_elements <= 2048 );
     if (softmax_elements == 0) {
        return;
     } else {
@@ -535,6 +540,11 @@ void dispatch_softmax_backward(output_t *grad_input, const input_t *grad, const 
                 softmax_warp_backward<input_t, output_t, acc_t, 1,32,32, is_log_softmax>
                     <<<blocks, threads, 0, at::cuda::getCurrentCUDAStream()>>>(grad_input, grad, output,
                         (uint32_t *)mask, p, batch_count, softmax_elements_stride, softmax_elements);
+                break;
+            case 11: // 2048
+                softmax_warp_backward<input_t, output_t, acc_t, 1,64,32, is_log_softmax>
+                    <<<blocks, threads, 0, at::cuda::getCurrentCUDAStream()>>>(grad_input, grad, output,
+                        (uint64_t *)mask, p, batch_count, softmax_elements_stride, softmax_elements);
                 break;
             default:
                 break;
