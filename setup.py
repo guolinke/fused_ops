@@ -186,6 +186,39 @@ ext_modules.append(
                                                 '-U__CUDA_NO_BFLOAT16_CONVERSIONS__',
                                                 '--expt-relaxed-constexpr',
                                                 '--expt-extended-lambda'] + version_dependent_macros + generator_flag}))
+
+ext_modules.append(
+    CUDAExtension(name='fused_layernorm_fast_cuda',
+                    sources=['csrc/layernorm_fast/interface.cpp',
+                            'csrc/layernorm_fast/layernorm.cu'],
+                    include_dirs=[os.path.join(this_dir, 'csrc')],
+                    extra_compile_args={'cxx': ['-O3',] + version_dependent_macros + generator_flag,
+                                        'nvcc':['-O3', '-lineinfo',
+                                                '-gencode', 'arch=compute_70,code=sm_70',
+                                                '-gencode', 'arch=compute_80,code=sm_80',
+                                                '-U__CUDA_NO_HALF_OPERATORS__',
+                                                '-U__CUDA_NO_BFLOAT16_OPERATORS__',
+                                                '-U__CUDA_NO_HALF_CONVERSIONS__',
+                                                '-U__CUDA_NO_BFLOAT16_CONVERSIONS__',
+                                                '--expt-relaxed-constexpr',
+                                                '--expt-extended-lambda'] + version_dependent_macros + generator_flag}))
+
+ext_modules.append(
+    CUDAExtension(name='fused_layernorm_backward_gamma_beta_cuda',
+                    sources=['csrc/layernorm_fast/interface_gamma_beta.cpp',
+                            'csrc/layernorm_fast/layernorm_backward.cu'],
+                    include_dirs=[os.path.join(this_dir, 'csrc')],
+                    extra_compile_args={'cxx': ['-O3',] + version_dependent_macros + generator_flag,
+                                        'nvcc':['-O3', '-lineinfo', '-maxrregcount=50',
+                                                '-gencode', 'arch=compute_70,code=sm_70',
+                                                '-gencode', 'arch=compute_80,code=sm_80',
+                                                '-U__CUDA_NO_HALF_OPERATORS__',
+                                                '-U__CUDA_NO_BFLOAT16_OPERATORS__',
+                                                '-U__CUDA_NO_HALF_CONVERSIONS__',
+                                                '-U__CUDA_NO_BFLOAT16_CONVERSIONS__',
+                                                '--expt-relaxed-constexpr',
+                                                '--expt-extended-lambda'] + version_dependent_macros + generator_flag}))
+
 setup(
     name='fused_ops',
     version='0.1',
