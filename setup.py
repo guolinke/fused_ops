@@ -156,6 +156,22 @@ ext_modules.append(
                                                 '--expt-extended-lambda'] + version_dependent_macros + generator_flag}))
 
 ext_modules.append(
+    CUDAExtension(name='fused_bias_gelu_cuda',
+                    sources=['csrc/bias_gelu/interface.cpp',
+                            'csrc/bias_gelu/bias_gelu.cu'],
+                    include_dirs=[os.path.join(this_dir, 'csrc')],
+                    extra_compile_args={'cxx': ['-O3',] + version_dependent_macros + generator_flag,
+                                        'nvcc':['-O3', '-lineinfo',
+                                                '-gencode', 'arch=compute_70,code=sm_70',
+                                                '-gencode', 'arch=compute_80,code=sm_80',
+                                                '-U__CUDA_NO_HALF_OPERATORS__',
+                                                '-U__CUDA_NO_BFLOAT16_OPERATORS__',
+                                                '-U__CUDA_NO_HALF_CONVERSIONS__',
+                                                '-U__CUDA_NO_BFLOAT16_CONVERSIONS__',
+                                                '--expt-relaxed-constexpr',
+                                                '--expt-extended-lambda'] + version_dependent_macros + generator_flag}))
+
+ext_modules.append(
     CUDAExtension(name='fused_bias_dropout_add_cuda',
                     sources=['csrc/bias_dropout_add/interface.cpp',
                             'csrc/bias_dropout_add/bias_dropout_add.cu'],
