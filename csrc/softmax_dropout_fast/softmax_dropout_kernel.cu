@@ -54,7 +54,7 @@ std::vector<torch::Tensor> fwd_cuda(
 
   // Padded Softmax
   bool softmax_success = false;
-  if (is_training) {
+  if (is_training && dropout_prob != 0.0) {
     auto gen = at::get_generator_or_default<at::CUDAGeneratorImpl>(gen_, at::cuda::detail::getDefaultCUDAGenerator());
     std::pair<uint64_t, uint64_t> rng_engine_inputs;
     {
@@ -64,7 +64,7 @@ std::vector<torch::Tensor> fwd_cuda(
     }
     uint64_t seed = std::get<0>(rng_engine_inputs);
     uint64_t offset = std::get<1>(rng_engine_inputs);
-    if (input.type().scalarType() == at::ScalarType::BFloat16){
+    if (input.scalar_type() == at::ScalarType::BFloat16){
         softmax_success = dispatch_softmax_forward<nv_bfloat16, nv_bfloat16, float, true>(
                                     reinterpret_cast<nv_bfloat16 *>(dropout_results.data_ptr()),
                                     reinterpret_cast<nv_bfloat16 *>(softmax_results_ptr),
@@ -74,7 +74,7 @@ std::vector<torch::Tensor> fwd_cuda(
                                     k_seq_len,
                                     k_seq_len,
                                     attn_batches*q_seq_len, seed, offset);
-    } else if (input.type().scalarType() == at::ScalarType::Half){
+    } else if (input.scalar_type() == at::ScalarType::Half){
         softmax_success = dispatch_softmax_forward<half, half, float, true>(
                                     reinterpret_cast<half *>(dropout_results.data_ptr()),
                                     reinterpret_cast<half *>(softmax_results_ptr),
@@ -84,7 +84,7 @@ std::vector<torch::Tensor> fwd_cuda(
                                     k_seq_len,
                                     k_seq_len,
                                     attn_batches*q_seq_len, seed, offset);
-    } else if (input.type().scalarType() == at::ScalarType::Float){
+    } else if (input.scalar_type() == at::ScalarType::Float){
         softmax_success = dispatch_softmax_forward<float, float, float, true>(
                                     reinterpret_cast<float *>(dropout_results.data_ptr()),
                                     reinterpret_cast<float *>(softmax_results_ptr),
@@ -97,8 +97,9 @@ std::vector<torch::Tensor> fwd_cuda(
     } else {
         softmax_success = false;
     }
+    return {dropout_results, dropout_mask, softmax_results};
   } else {
-    if (input.type().scalarType() == at::ScalarType::BFloat16){
+    if (input.scalar_type() == at::ScalarType::BFloat16){
         softmax_success = dispatch_softmax_forward<nv_bfloat16, nv_bfloat16, float, false>(
                                     reinterpret_cast<nv_bfloat16 *>(softmax_results_ptr),
                                     nullptr,
@@ -108,7 +109,7 @@ std::vector<torch::Tensor> fwd_cuda(
                                     k_seq_len,
                                     k_seq_len,
                                     attn_batches*q_seq_len, 0, 0);
-    } else if (input.type().scalarType() == at::ScalarType::Half){
+    } else if (input.scalar_type() == at::ScalarType::Half){
         softmax_success = dispatch_softmax_forward<half, half, float, false>(
                                     reinterpret_cast<half *>(softmax_results_ptr),
                                     nullptr,
@@ -118,7 +119,7 @@ std::vector<torch::Tensor> fwd_cuda(
                                     k_seq_len,
                                     k_seq_len,
                                     attn_batches*q_seq_len, 0, 0);
-    } else if (input.type().scalarType() == at::ScalarType::Float){
+    } else if (input.scalar_type() == at::ScalarType::Float){
         softmax_success = dispatch_softmax_forward<float, float, float, false>(
                                     reinterpret_cast<float *>(softmax_results_ptr),
                                     nullptr,
@@ -131,13 +132,8 @@ std::vector<torch::Tensor> fwd_cuda(
     } else {
         softmax_success = false;
     }
+    return {softmax_results, dropout_mask, softmax_results};
   }
-
-  return {
-           dropout_results,  
-           dropout_mask, 
-           softmax_results
-         };
 }
 
 torch::Tensor bwd_cuda(
@@ -163,36 +159,64 @@ torch::Tensor bwd_cuda(
 
   // Apply Dropout Mask and Scale by Dropout Probability 
   // Softmax Grad
-  if (softmax_results.type().scalarType() == at::ScalarType::BFloat16){
-    dispatch_softmax_backward<nv_bfloat16, nv_bfloat16, float, false>(
-                            reinterpret_cast<nv_bfloat16 *>(output_grads.data_ptr()), 
-                            reinterpret_cast<nv_bfloat16 *>(output_grads.data_ptr()), 
-                            reinterpret_cast<const nv_bfloat16 *>(softmax_results.data_ptr()),
-                            reinterpret_cast<const void *>(dropout_mask.data_ptr()),
-                            1.0f - dropout_prob,
-                            k_seq_len,
-                            k_seq_len,
-                            attn_batches*q_seq_len);
-  } else if (softmax_results.type().scalarType() == at::ScalarType::Half){
-    dispatch_softmax_backward<half, half, float, false>(
-                            reinterpret_cast<half *>(output_grads.data_ptr()), 
-                            reinterpret_cast<half *>(output_grads.data_ptr()), 
-                            reinterpret_cast<const half *>(softmax_results.data_ptr()),
-                            reinterpret_cast<const void *>(dropout_mask.data_ptr()),
-                            1.0f - dropout_prob,
-                            k_seq_len,
-                            k_seq_len,
-                            attn_batches*q_seq_len);
-  } else if (softmax_results.type().scalarType() == at::ScalarType::Float){
-    dispatch_softmax_backward<float, float, float, false>(
-                            reinterpret_cast<float *>(output_grads.data_ptr()), 
-                            reinterpret_cast<float *>(output_grads.data_ptr()), 
-                            reinterpret_cast<const float *>(softmax_results.data_ptr()),
-                            reinterpret_cast<const void *>(dropout_mask.data_ptr()),
-                            1.0f - dropout_prob,
-                            k_seq_len,
-                            k_seq_len,
-                            attn_batches*q_seq_len);
+  if (dropout_prob != 0.0) {
+      if (softmax_results.scalar_type() == at::ScalarType::BFloat16){
+        dispatch_softmax_backward<nv_bfloat16, nv_bfloat16, float, false>(
+                                reinterpret_cast<nv_bfloat16 *>(output_grads.data_ptr()), 
+                                reinterpret_cast<nv_bfloat16 *>(output_grads.data_ptr()), 
+                                reinterpret_cast<const nv_bfloat16 *>(softmax_results.data_ptr()),
+                                reinterpret_cast<const void *>(dropout_mask.data_ptr()),
+                                1.0f - dropout_prob,
+                                k_seq_len,
+                                k_seq_len,
+                                attn_batches*q_seq_len);
+    } else if (softmax_results.scalar_type() == at::ScalarType::Half){
+        dispatch_softmax_backward<half, half, float, false>(
+                                reinterpret_cast<half *>(output_grads.data_ptr()), 
+                                reinterpret_cast<half *>(output_grads.data_ptr()), 
+                                reinterpret_cast<const half *>(softmax_results.data_ptr()),
+                                reinterpret_cast<const void *>(dropout_mask.data_ptr()),
+                                1.0f - dropout_prob,
+                                k_seq_len,
+                                k_seq_len,
+                                attn_batches*q_seq_len);
+    } else if (softmax_results.scalar_type() == at::ScalarType::Float){
+        dispatch_softmax_backward<float, float, float, false>(
+                                reinterpret_cast<float *>(output_grads.data_ptr()), 
+                                reinterpret_cast<float *>(output_grads.data_ptr()), 
+                                reinterpret_cast<const float *>(softmax_results.data_ptr()),
+                                reinterpret_cast<const void *>(dropout_mask.data_ptr()),
+                                1.0f - dropout_prob,
+                                k_seq_len,
+                                k_seq_len,
+                                attn_batches*q_seq_len);
+    }
+  } else {
+    if (softmax_results.scalar_type() == at::ScalarType::BFloat16){
+        dispatch_softmax_nomask_backward<nv_bfloat16, nv_bfloat16, float, false>(
+                                reinterpret_cast<nv_bfloat16 *>(output_grads.data_ptr()), 
+                                reinterpret_cast<nv_bfloat16 *>(output_grads.data_ptr()), 
+                                reinterpret_cast<const nv_bfloat16 *>(softmax_results.data_ptr()),
+                                k_seq_len,
+                                k_seq_len,
+                                attn_batches*q_seq_len);
+    } else if (softmax_results.scalar_type() == at::ScalarType::Half){
+        dispatch_softmax_nomask_backward<half, half, float, false>(
+                                reinterpret_cast<half *>(output_grads.data_ptr()), 
+                                reinterpret_cast<half *>(output_grads.data_ptr()), 
+                                reinterpret_cast<const half *>(softmax_results.data_ptr()),
+                                k_seq_len,
+                                k_seq_len,
+                                attn_batches*q_seq_len);
+    } else if (softmax_results.scalar_type() == at::ScalarType::Float){
+        dispatch_softmax_nomask_backward<float, float, float, false>(
+                                reinterpret_cast<float *>(output_grads.data_ptr()), 
+                                reinterpret_cast<float *>(output_grads.data_ptr()), 
+                                reinterpret_cast<const float *>(softmax_results.data_ptr()),
+                                k_seq_len,
+                                k_seq_len,
+                                attn_batches*q_seq_len);
+    }
   }
 
 //backward pass is completely in-place
