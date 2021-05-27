@@ -108,7 +108,7 @@ ext_modules.append(
                             'csrc/layernorm/layernorm_kernel.cu'],
                     include_dirs=[os.path.join(this_dir, 'csrc')],
                     extra_compile_args={'cxx': ['-O3'] + version_dependent_macros,
-                                        'nvcc':['-maxrregcount=50', '-O3'] + version_dependent_macros}))
+                                        'nvcc':['-maxrregcount=50', '-O3', '--use_fast_math'] + version_dependent_macros}))
 
 ext_modules.append(
     CUDAExtension(name='fused_adam_cuda_v2',
@@ -116,7 +116,7 @@ ext_modules.append(
                             'csrc/adam/adam_kernel.cu'],
                     include_dirs=[os.path.join(this_dir, 'csrc')],
                     extra_compile_args={'cxx': ['-O3'] + version_dependent_macros,
-                                        'nvcc':['-O3'] + version_dependent_macros}))
+                                        'nvcc':['-O3', '--use_fast_math'] + version_dependent_macros}))
 
 generator_flag = []
 torch_dir = torch.__path__[0]
@@ -129,7 +129,7 @@ ext_modules.append(
                             'csrc/softmax_dropout/softmax_dropout_kernel.cu'],
                     include_dirs=[os.path.join(this_dir, 'csrc')],
                     extra_compile_args={'cxx': ['-O3',] + version_dependent_macros + generator_flag,
-                                        'nvcc':['-O3',
+                                        'nvcc':['-O3', '--use_fast_math',
                                                 '-gencode', 'arch=compute_70,code=sm_70',
                                                 '-gencode', 'arch=compute_80,code=sm_80',
                                                 '-U__CUDA_NO_HALF_OPERATORS__',
@@ -145,7 +145,7 @@ ext_modules.append(
                             'csrc/softmax_dropout_fast/softmax_dropout_kernel.cu'],
                     include_dirs=[os.path.join(this_dir, 'csrc')],
                     extra_compile_args={'cxx': ['-O3',] + version_dependent_macros + generator_flag,
-                                        'nvcc':['-O3', '-lineinfo', '--use_fast_math',
+                                        'nvcc':['-O3', '--use_fast_math',
                                                 '-gencode', 'arch=compute_70,code=sm_70',
                                                 '-gencode', 'arch=compute_80,code=sm_80',
                                                 '-U__CUDA_NO_HALF_OPERATORS__',
@@ -161,7 +161,7 @@ ext_modules.append(
                             'csrc/bias_gelu/bias_gelu.cu'],
                     include_dirs=[os.path.join(this_dir, 'csrc')],
                     extra_compile_args={'cxx': ['-O3',] + version_dependent_macros + generator_flag,
-                                        'nvcc':['-O3', '-lineinfo',
+                                        'nvcc':['-O3', 
                                                 '-gencode', 'arch=compute_70,code=sm_70',
                                                 '-gencode', 'arch=compute_80,code=sm_80',
                                                 '-U__CUDA_NO_HALF_OPERATORS__',
@@ -177,7 +177,7 @@ ext_modules.append(
                             'csrc/bias_dropout_add/bias_dropout_add.cu'],
                     include_dirs=[os.path.join(this_dir, 'csrc')],
                     extra_compile_args={'cxx': ['-O3',] + version_dependent_macros + generator_flag,
-                                        'nvcc':['-O3', '-lineinfo',
+                                        'nvcc':['-O3', 
                                                 '-gencode', 'arch=compute_70,code=sm_70',
                                                 '-gencode', 'arch=compute_80,code=sm_80',
                                                 '-U__CUDA_NO_HALF_OPERATORS__',
@@ -193,7 +193,7 @@ ext_modules.append(
                             'csrc/layernorm_fast/layernorm.cu'],
                     include_dirs=[os.path.join(this_dir, 'csrc')],
                     extra_compile_args={'cxx': ['-O3',] + version_dependent_macros + generator_flag,
-                                        'nvcc':['-O3', '-lineinfo',
+                                        'nvcc':['-O3', '--use_fast_math',
                                                 '-gencode', 'arch=compute_70,code=sm_70',
                                                 '-gencode', 'arch=compute_80,code=sm_80',
                                                 '-U__CUDA_NO_HALF_OPERATORS__',
@@ -209,7 +209,7 @@ ext_modules.append(
                             'csrc/layernorm_fast/layernorm_backward.cu'],
                     include_dirs=[os.path.join(this_dir, 'csrc')],
                     extra_compile_args={'cxx': ['-O3',] + version_dependent_macros + generator_flag,
-                                        'nvcc':['-O3', '-lineinfo', '-maxrregcount=50',
+                                        'nvcc':['-O3', '--use_fast_math', '-maxrregcount=50',
                                                 '-gencode', 'arch=compute_70,code=sm_70',
                                                 '-gencode', 'arch=compute_80,code=sm_80',
                                                 '-U__CUDA_NO_HALF_OPERATORS__',

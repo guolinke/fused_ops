@@ -72,7 +72,7 @@ void fused_adam_cuda(
     }
     float decay_size = 1.0;
     if (decay != 0.0) {
-        decay_size = 1.0 - lr * decay;
+        decay_size = 1.0 - step_size * decay;
     }
     cudaStream_t stream = at::cuda::getCurrentCUDAStream();
 
