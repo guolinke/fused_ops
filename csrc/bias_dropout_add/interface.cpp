@@ -5,7 +5,7 @@
 
 std::vector<c10::optional<torch::Tensor>> bias_dropout_add_forward_cuda(const torch::Tensor &x, const torch::Tensor &bias,
     const torch::Tensor &residual, bool is_training, float dropout_prob, c10::optional<at::Generator> gen_);
-torch::Tensor bias_dropout_add_backward_cuda(const torch::Tensor &grad, const torch::Tensor &mask);
+torch::Tensor bias_dropout_add_backward_cuda(const torch::Tensor &grad, const torch::Tensor &mask, float dropout_prob);
 
 std::vector<c10::optional<torch::Tensor>> bias_dropout_add_forward(const torch::Tensor &x, const torch::Tensor &bias,
     const torch::Tensor &residual, bool is_training, float dropout_prob, c10::optional<at::Generator> gen_) {
@@ -18,9 +18,9 @@ std::vector<c10::optional<torch::Tensor>> bias_dropout_add_forward(const torch::
     return bias_dropout_add_forward_cuda(x, bias, residual, is_training, dropout_prob, gen_);
 }
 
-torch::Tensor bias_dropout_add_backward(const torch::Tensor &grad, const torch::Tensor &mask) {
+torch::Tensor bias_dropout_add_backward(const torch::Tensor &grad, const torch::Tensor &mask, float dropout_prob) {
     AT_ASSERTM(grad.is_contiguous(), "input must be contiguous");
-    return bias_dropout_add_backward_cuda(grad, mask);
+    return bias_dropout_add_backward_cuda(grad, mask, dropout_prob);
 }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {

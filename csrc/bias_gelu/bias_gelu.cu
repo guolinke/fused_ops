@@ -26,7 +26,7 @@ __device__ acc_t torch_gelu(acc_t y) {
 }
 
 template <typename acc_t>
-__device__ acc_t tanh_gelu(acc_t y) {
+__device__ acc_t fast_gelu(acc_t y) {
     return y * 0.5 * (1.0 + tanhf(0.79788456 * y * (1 + 0.044715 * y * y)));
 }
 
@@ -39,7 +39,7 @@ __device__ acc_t torch_gelu_back(acc_t y, acc_t g) {
 }
 
 template <typename acc_t>
-__device__ acc_t tanh_gelu_back(acc_t y, acc_t g) {
+__device__ acc_t fast_gelu_back(acc_t y, acc_t g) {
     acc_t tanh_out = tanhf(0.79788456 * y * (1 + 0.044715 * y * y));
     acc_t ff = 0.5 * y * ((1 - tanh_out * tanh_out) * (0.79788456 + 0.1070322243 * y * y)) + 0.5 * (1 + tanh_out);
     return ff * g;
@@ -253,9 +253,9 @@ torch::Tensor bias_gelu_backward_cuda(const torch::Tensor &x, const torch::Tenso
 using ForwardFunc = torch::Tensor (*)(const torch::Tensor &, const torch::Tensor &);
 
 ForwardFunc bias_gelu_torch_forward_cuda = bias_gelu_forward_cuda<torch_gelu>;
-ForwardFunc bias_gelu_tanh_forward_cuda = bias_gelu_forward_cuda<tanh_gelu>;
+ForwardFunc bias_gelu_fast_forward_cuda = bias_gelu_forward_cuda<fast_gelu>;
 
 using BackwardFunc = torch::Tensor (*)(const torch::Tensor &, const torch::Tensor &, const torch::Tensor &);
 
 BackwardFunc bias_gelu_torch_backward_cuda = bias_gelu_backward_cuda<torch_gelu_back>;
-BackwardFunc bias_gelu_tanh_backward_cuda = bias_gelu_backward_cuda<tanh_gelu_back>;
+BackwardFunc bias_gelu_fast_backward_cuda = bias_gelu_backward_cuda<fast_gelu_back>;
