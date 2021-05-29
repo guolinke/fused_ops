@@ -56,6 +56,47 @@ __global__ void bias_gelu_forward(output_t *dst, const input_t *src, const input
     }
 }
 
+template <typename T>
+struct VecTypeImpl;
+
+template <>
+struct VecTypeImpl<half> {
+    using type = half2;
+};
+
+
+template <>
+struct VecTypeImpl<nv_bfloat16> {
+    using type = nv_bfloat162;
+};
+
+template <>
+struct VecTypeImpl<float> {
+    using type = float2;
+};
+
+template <typename T>
+using VecType = typename VecTypeImpl<T>::type;
+
+template <typename index_t, typename input_t, typename output_t, typename acc_t, acc_t (*gelu_func)(acc_t)>
+__global__ void bias_gelu_forward_vec(output_t *dst, const input_t *src, const input_t *bias, index_t bsz, int dim) {
+    using VecInType = VecType<input_t>;
+    using VecOutType = VecType<output_t>;
+    for (int j = threadIdx.x * 2; j < dim; j += blockDim.x * 2) {
+        if (blockIdx.x < bsz) {
+            index_t idx = blockIdx.x * dim + j;
+            VecInType s = *(VecInType *)(src + idx);
+            VecInType b = *(VecInType *)(bias + j);
+            acc_t y1 = s.x + b.x;
+            acc_t y2 = s.y + b.y;
+            VecOutType d;
+            d.x = gelu_func(y1);
+            d.y = gelu_func(y2);
+            *(VecOutType *)(dst + idx) = d;
+        }
+    }
+}
+
 template <typename index_t, typename input_t, typename output_t, typename acc_t, acc_t (*gelu_back_func)(acc_t, acc_t)>
 __global__ void bias_gelu_backward(output_t *dst, const input_t *src, const input_t *bias,
     const input_t *grad, index_t bsz, int dim) {
@@ -65,6 +106,27 @@ __global__ void bias_gelu_backward(output_t *dst, const input_t *src, const inpu
             acc_t y = (acc_t)(src[idx] + bias[j]);
             acc_t g = grad[idx];
             dst[idx] = (output_t)gelu_back_func(y, g);
+        }
+    }
+}
+
+template <typename index_t, typename input_t, typename output_t, typename acc_t, acc_t (*gelu_back_func)(acc_t, acc_t)>
+__global__ void bias_gelu_backward_vec(output_t *dst, const input_t *src, const input_t *bias,
+    const input_t *grad, index_t bsz, int dim) {
+    using VecInType = VecType<input_t>;
+    using VecOutType = VecType<output_t>;
+    for (int j = threadIdx.x * 2; j < dim; j += blockDim.x * 2) {
+        if (blockIdx.x < bsz) {
+            index_t idx = blockIdx.x * dim + j;
+            VecInType s = *(VecInType *)(src + idx);
+            VecInType b = *(VecInType *)(bias + j);
+            VecInType g = *(VecInType *)(grad + idx);
+            acc_t y1 = s.x + b.x;
+            acc_t y2 = s.y + b.y;
+            VecOutType d;
+            d.x = gelu_back_func(y1, g.x);
+            d.y = gelu_back_func(y2, g.y);
+            *(VecOutType *)(dst + idx) = d;
         }
     }
 }
@@ -82,20 +144,39 @@ torch::Tensor bias_gelu_forward_cuda(const torch::Tensor &x, const torch::Tensor
     torch::Tensor results = torch::empty(sizes, dst_options);
     auto type = x.scalar_type();
     const int ThreadsPerBlock = 256;
+    int ThreadsPerBlockVec = CELL(dim, 256) * 256 % 512 == 0 ? 256 : 128;
     if (type == at::ScalarType::BFloat16) {
-        bias_gelu_forward<size_t, nv_bfloat16, nv_bfloat16, float, gelu_func><<<bsz, ThreadsPerBlock, 0, stream>>>(
-            (nv_bfloat16 *)results.data_ptr(),
-            (const nv_bfloat16 *)x.data_ptr(),
-            (const nv_bfloat16 *)bias.data_ptr(),
-            bsz,
-            dim);
+        if (dim % 2 == 0) {
+            bias_gelu_forward_vec<size_t, nv_bfloat16, nv_bfloat16, float, gelu_func><<<bsz, ThreadsPerBlockVec, 0, stream>>>(
+                (nv_bfloat16 *)results.data_ptr(),
+                (const nv_bfloat16 *)x.data_ptr(),
+                (const nv_bfloat16 *)bias.data_ptr(),
+                bsz,
+                dim);
+        } else {
+            bias_gelu_forward<size_t, nv_bfloat16, nv_bfloat16, float, gelu_func><<<bsz, ThreadsPerBlock, 0, stream>>>(
+                (nv_bfloat16 *)results.data_ptr(),
+                (const nv_bfloat16 *)x.data_ptr(),
+                (const nv_bfloat16 *)bias.data_ptr(),
+                bsz,
+                dim);
+        }
     } else if (type == at::ScalarType::Half) {
-        bias_gelu_forward<size_t, half, half, float, gelu_func><<<bsz, ThreadsPerBlock, 0, stream>>>(
-            (half *)results.data_ptr(),
-            (const half *)x.data_ptr(),
-            (const half *)bias.data_ptr(),
-            bsz,
-            dim);
+        if (dim % 2 == 0) {
+            bias_gelu_forward_vec<size_t, half, half, float, gelu_func><<<bsz, ThreadsPerBlockVec, 0, stream>>>(
+                (half *)results.data_ptr(),
+                (const half *)x.data_ptr(),
+                (const half *)bias.data_ptr(),
+                bsz,
+                dim);
+        } else {
+            bias_gelu_forward<size_t, half, half, float, gelu_func><<<bsz, ThreadsPerBlock, 0, stream>>>(
+                (half *)results.data_ptr(),
+                (const half *)x.data_ptr(),
+                (const half *)bias.data_ptr(),
+                bsz,
+                dim);
+        }
     } else if (type == at::ScalarType::Float) {
         bias_gelu_forward<size_t, float, float, float, gelu_func><<<bsz, ThreadsPerBlock, 0, stream>>>(
             (float *)results.data_ptr(),
@@ -120,22 +201,43 @@ torch::Tensor bias_gelu_backward_cuda(const torch::Tensor &x, const torch::Tenso
     torch::Tensor results = torch::empty(sizes, dst_options);
     auto type = x.scalar_type();
     const int ThreadsPerBlock = 256;
+    int ThreadsPerBlockVec = CELL(dim, 256) * 256 % 512 == 0 ? 256 : 128;
     if (type == at::ScalarType::BFloat16) {
-        bias_gelu_backward<size_t, nv_bfloat16, nv_bfloat16, float, gelu_back_func><<<bsz, ThreadsPerBlock, 0, stream>>>(
-            (nv_bfloat16 *)results.data_ptr(),
-            (const nv_bfloat16 *)x.data_ptr(),
-            (const nv_bfloat16 *)bias.data_ptr(),
-            (const nv_bfloat16 *)grad.data_ptr(),
-            bsz,
-            dim);
+        if (dim % 2 == 0) {
+            bias_gelu_backward_vec<size_t, nv_bfloat16, nv_bfloat16, float, gelu_back_func><<<bsz, ThreadsPerBlockVec, 0, stream>>>(
+                (nv_bfloat16 *)results.data_ptr(),
+                (const nv_bfloat16 *)x.data_ptr(),
+                (const nv_bfloat16 *)bias.data_ptr(),
+                (const nv_bfloat16 *)grad.data_ptr(),
+                bsz,
+                dim);
+        } else {
+            bias_gelu_backward<size_t, nv_bfloat16, nv_bfloat16, float, gelu_back_func><<<bsz, ThreadsPerBlock, 0, stream>>>(
+                (nv_bfloat16 *)results.data_ptr(),
+                (const nv_bfloat16 *)x.data_ptr(),
+                (const nv_bfloat16 *)bias.data_ptr(),
+                (const nv_bfloat16 *)grad.data_ptr(),
+                bsz,
+                dim);
+            }
     } else if (type == at::ScalarType::Half) {
-        bias_gelu_backward<size_t, half, half, float, gelu_back_func><<<bsz, ThreadsPerBlock, 0, stream>>>(
-            (half *)results.data_ptr(),
-            (const half *)x.data_ptr(),
-            (const half *)bias.data_ptr(),
-            (const half *)grad.data_ptr(),
-            bsz,
-            dim);
+        if (dim % 2 == 0) {
+            bias_gelu_backward_vec<size_t, half, half, float, gelu_back_func><<<bsz, ThreadsPerBlockVec, 0, stream>>>(
+                (half *)results.data_ptr(),
+                (const half *)x.data_ptr(),
+                (const half *)bias.data_ptr(),
+                (const half *)grad.data_ptr(),
+                bsz,
+                dim);
+        } else {
+            bias_gelu_backward<size_t, half, half, float, gelu_back_func><<<bsz, ThreadsPerBlock, 0, stream>>>(
+                (half *)results.data_ptr(),
+                (const half *)x.data_ptr(),
+                (const half *)bias.data_ptr(),
+                (const half *)grad.data_ptr(),
+                bsz,
+                dim);
+        }
     } else if (type == at::ScalarType::Float) {
         bias_gelu_backward<size_t, float, float, float, gelu_back_func><<<bsz, ThreadsPerBlock, 0, stream>>>(
             (float *)results.data_ptr(),

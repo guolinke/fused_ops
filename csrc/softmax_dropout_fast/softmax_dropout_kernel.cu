@@ -20,7 +20,7 @@
 // symbol to be automatically resolved by PyTorch libs
 extern THCState *state;
 
-std::vector<torch::Tensor> fwd_cuda(
+std::vector<c10::optional<torch::Tensor>> fwd_cuda(
                                bool                 is_training,
                                int                  heads,
                                torch::Tensor const& input, 
@@ -45,8 +45,6 @@ std::vector<torch::Tensor> fwd_cuda(
   auto mask_options = act_options.dtype(softmax_mask_dtype(k_seq_len));
 
   torch::Tensor softmax_results   = torch::empty({attn_batches, q_seq_len, k_seq_len},   act_options);
-  torch::Tensor dropout_results   = torch::empty({attn_batches, q_seq_len, k_seq_len},   act_options);
-  torch::Tensor dropout_mask      = torch::empty({softmax_mask_size(attn_batches * q_seq_len, k_seq_len)},   mask_options);
 
   // Softmax Intermediate Result Ptr (used by Matmul1 -> Softmax)
   void* input_ptr = static_cast<void*>(input.data_ptr());
@@ -55,6 +53,8 @@ std::vector<torch::Tensor> fwd_cuda(
   // Padded Softmax
   bool softmax_success = false;
   if (is_training && dropout_prob != 0.0) {
+    torch::Tensor dropout_results   = torch::empty({attn_batches, q_seq_len, k_seq_len},   act_options);
+    torch::Tensor dropout_mask      = torch::empty({softmax_mask_size(attn_batches * q_seq_len, k_seq_len)},   mask_options);
     auto gen = at::get_generator_or_default<at::CUDAGeneratorImpl>(gen_, at::cuda::detail::getDefaultCUDAGenerator());
     std::pair<uint64_t, uint64_t> rng_engine_inputs;
     {
@@ -132,7 +132,7 @@ std::vector<torch::Tensor> fwd_cuda(
     } else {
         softmax_success = false;
     }
-    return {softmax_results, dropout_mask, softmax_results};
+    return {softmax_results, c10::optional<torch::Tensor>(), softmax_results};
   }
 }
 
@@ -140,7 +140,7 @@ torch::Tensor bwd_cuda(
                         int heads,
                         torch::Tensor const& output_grads, 
                         torch::Tensor const& softmax_results, 
-                        torch::Tensor const& dropout_mask,
+                        c10::optional<torch::Tensor> const& dropout_mask,
                         float                dropout_prob
                         ) 
 {
@@ -159,13 +159,13 @@ torch::Tensor bwd_cuda(
 
   // Apply Dropout Mask and Scale by Dropout Probability 
   // Softmax Grad
-  if (dropout_prob != 0.0) {
+  if (dropout_prob != 0.0 && dropout_mask) {
       if (softmax_results.scalar_type() == at::ScalarType::BFloat16){
         dispatch_softmax_backward<nv_bfloat16, nv_bfloat16, float, false>(
                                 reinterpret_cast<nv_bfloat16 *>(output_grads.data_ptr()), 
                                 reinterpret_cast<nv_bfloat16 *>(output_grads.data_ptr()), 
                                 reinterpret_cast<const nv_bfloat16 *>(softmax_results.data_ptr()),
-                                reinterpret_cast<const void *>(dropout_mask.data_ptr()),
+                                reinterpret_cast<const void *>(dropout_mask->data_ptr()),
                                 1.0f - dropout_prob,
                                 k_seq_len,
                                 k_seq_len,
@@ -175,7 +175,7 @@ torch::Tensor bwd_cuda(
                                 reinterpret_cast<half *>(output_grads.data_ptr()), 
                                 reinterpret_cast<half *>(output_grads.data_ptr()), 
                                 reinterpret_cast<const half *>(softmax_results.data_ptr()),
-                                reinterpret_cast<const void *>(dropout_mask.data_ptr()),
+                                reinterpret_cast<const void *>(dropout_mask->data_ptr()),
                                 1.0f - dropout_prob,
                                 k_seq_len,
                                 k_seq_len,
@@ -185,7 +185,7 @@ torch::Tensor bwd_cuda(
                                 reinterpret_cast<float *>(output_grads.data_ptr()), 
                                 reinterpret_cast<float *>(output_grads.data_ptr()), 
                                 reinterpret_cast<const float *>(softmax_results.data_ptr()),
-                                reinterpret_cast<const void *>(dropout_mask.data_ptr()),
+                                reinterpret_cast<const void *>(dropout_mask->data_ptr()),
                                 1.0f - dropout_prob,
                                 k_seq_len,
                                 k_seq_len,
