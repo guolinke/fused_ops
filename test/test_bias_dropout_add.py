@@ -22,6 +22,7 @@ def test_err(bsz, dim, seq_len, p):
                 m = mask_cpu[i, j, d].item()
                 for k in range(64):
                     mask_[i, j, d * 64 + k] = (m >> k) & 1;
+    print((mask_.sum() / mask_.numel()).item())
     mask_ = mask_.cuda()
     y2 = (x + bias) * mask_ / (1 - p) + residual
     dy = (y1 - y2).abs()

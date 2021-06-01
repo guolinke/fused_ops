@@ -57,6 +57,5 @@ def test_speed(name, bsz, seq_len, n, f):
 
     print(name, 'forward', forward_time / n, 'ms, backward', backward_time / n, 'ms')
 
-test_err(10, 512)
 test_speed('old', 16 * 12, 512, 10000, lambda x: softmax_dropout_func(True, 12, x, 0.1))
 test_speed('new', 16 * 12, 512, 10000, lambda x: softmax_dropout_fast_func(True, 12, x, 0.1))

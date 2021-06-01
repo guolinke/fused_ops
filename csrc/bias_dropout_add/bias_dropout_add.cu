@@ -31,10 +31,10 @@ __global__ void generate_dropout_mask_kernel(MaskType* output, IndexType n, uint
     #pragma unroll
     for (int i = 0; i < sizeof(MaskType) * 2; ++i) {
         float4 rand = curand_uniform4(&state);
-        mask |= ((rand.x < p) << (i * 4))
-            | ((rand.y < p) << (i * 4 + 1))
-            | ((rand.z < p) << (i * 4 + 2))
-            | ((rand.w < p) << (i * 4 + 3));
+        mask |= (((MaskType)(rand.x < p)) << (i * 4))
+            | (((MaskType)(rand.y < p)) << (i * 4 + 1))
+            | (((MaskType)(rand.z < p)) << (i * 4 + 2))
+            | (((MaskType)(rand.w < p)) << (i * 4 + 3));
     }
     if (idx < n) {
         output[idx] = mask;
@@ -70,7 +70,7 @@ __global__ void bias_dropout_add_forward(output_t *dst, const input_t *x, const 
             for (int j = threadIdx.x; j < dim; j += blockDim.x) {
                 index_t idx = blockIdx.x * dim + j;
                 input_t y = x[idx] + bias[j];
-                input_t m = from_uint8<input_t>(((mask[mask_index + j / 8] & (1 << mask_offset)) >> mask_offset));
+                input_t m = from_uint8<input_t>((mask[mask_index + j / 8] >> mask_offset) & 1);
                 dst[idx] = y * m * pinv + residual[idx];
             }
         } else {
@@ -120,8 +120,8 @@ __global__ void bias_dropout_add_forward_vec(output_t *dst, const input_t *x, co
                 VecInType b = *(VecInType *)(bias + j);
                 VecInType r = *(VecInType *)(residual + idx);
                 uint8_t m = mask[mask_index + j / 8];
-                input_t m1 = from_uint8<input_t>(((m & (1 << mask_offset1)) >> mask_offset1));
-                input_t m2 = from_uint8<input_t>(((m & (1 << mask_offset2)) >> mask_offset2));
+                input_t m1 = from_uint8<input_t>((m >> mask_offset1) & 1);
+                input_t m2 = from_uint8<input_t>((m >> mask_offset2) & 1);
                 VecOutType d;
                 d.x = (xi.x + b.x) * m1 * pinv + r.x;
                 d.y = (xi.y + b.y) * m2 * pinv + r.y;
@@ -149,7 +149,7 @@ __global__ void bias_dropout_add_backward(output_t *dst, const input_t *grad, co
         uint8_t mask_offset = threadIdx.x % 8;
         for (int j = threadIdx.x; j < dim; j += blockDim.x) {
             index_t idx = blockIdx.x * dim + j;
-            uint8_t m = (mask[mask_index + j / 8] & (1 << mask_offset)) >> mask_offset;
+            uint8_t m = (mask[mask_index + j / 8] >> mask_offset) & 1;
             dst[idx] = grad[idx] * from_uint8<input_t>(m) * pinv;
         }
     }
@@ -168,8 +168,8 @@ __global__ void bias_dropout_add_backward_vec(output_t *dst, const input_t *grad
             uint8_t m = mask[mask_index + j / 8];
             VecInType g = *(VecInType *)(grad + idx);
             VecOutType d;
-            d.x = g.x * from_uint8<input_t>(((m & (1 << mask_offset1)) >> mask_offset1)) * pinv;
-            d.y = g.y * from_uint8<input_t>(((m & (1 << mask_offset2)) >> mask_offset2)) * pinv;
+            d.x = g.x * from_uint8<input_t>((m >> mask_offset1) & 1) * pinv;
+            d.y = g.y * from_uint8<input_t>((m >> mask_offset2) & 1) * pinv;
             *(VecOutType *)(dst + idx) = d;
         }
     }
