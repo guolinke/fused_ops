@@ -189,7 +189,7 @@ __global__ void softmax_warp_forward(input_t *dst, input_t *dst_orig, const outp
                 float *rand_l = (float *)rand;
                 #pragma unroll
                 for (int j = 0; j < WARP_ITERATIONS; ++j) {
-                    m |= (rand_l[j] < p) << j;
+                    m |= ((MaskType)(rand_l[j] < p)) << j;
                 }
             }
             mask[i * mask_stride + local_idx] = m;
@@ -197,7 +197,7 @@ __global__ void softmax_warp_forward(input_t *dst, input_t *dst_orig, const outp
             for (int it = 0;it < WARP_ITERATIONS; ++it) {
                 int element_index = local_idx + it * WARP_SIZE;
                 if (element_index < element_count) {
-                    dst[i * element_count + it * WARP_SIZE] = (acc_t)((m & (1 << it)) >> it) * pinv * (elements[i][it] / sum[i]);
+                    dst[i * element_count + it * WARP_SIZE] = (acc_t)((m >> it) & 1) * pinv * (elements[i][it] / sum[i]);
                     dst_orig[i * element_count + it * WARP_SIZE] = elements[i][it] / sum[i];
                 }
                 else {
@@ -422,7 +422,7 @@ __global__ void softmax_warp_backward(output_t *gradInput, const input_t *grad, 
         for (int it = 0;  it < WARP_ITERATIONS;  ++it) {
             int element_index = local_idx + it * WARP_SIZE;
             if (element_index < batch_element_count) {
-                grad_reg[i][it] = (input_t)((acc_t)((m & (1 << it)) >> it) * (acc_t)grad[i*element_count+it*WARP_SIZE] * pinv )*output[i*element_count+it*WARP_SIZE];;
+                grad_reg[i][it] = (input_t)((acc_t)((m >> it) & 1) * (acc_t)grad[i*element_count+it*WARP_SIZE] * pinv )*output[i*element_count+it*WARP_SIZE];;
                 output_reg[i][it] = output[i*element_count+it*WARP_SIZE];
             } else {
                 grad_reg[i][it] = acc_t(0);
