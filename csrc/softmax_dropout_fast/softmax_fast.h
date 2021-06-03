@@ -197,8 +197,9 @@ __global__ void softmax_warp_forward(input_t *dst, input_t *dst_orig, const outp
             for (int it = 0;it < WARP_ITERATIONS; ++it) {
                 int element_index = local_idx + it * WARP_SIZE;
                 if (element_index < element_count) {
-                    dst[i * element_count + it * WARP_SIZE] = (acc_t)((m >> it) & 1) * pinv * (elements[i][it] / sum[i]);
-                    dst_orig[i * element_count + it * WARP_SIZE] = elements[i][it] / sum[i];
+                    output_t d = elements[i][it] / sum[i];
+                    dst[i * element_count + it * WARP_SIZE] = (acc_t)d * ((acc_t)((m >> it) & 1) * pinv);
+                    dst_orig[i * element_count + it * WARP_SIZE] = d;
                 }
                 else {
                     break;
