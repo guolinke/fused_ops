@@ -171,7 +171,7 @@ __global__ void softmax_warp_forward(input_t *dst, input_t *dst_orig, const outp
 
     // store result
     if IF_CONSTEXPR (need_mask) {
-        acc_t pinv = 1 / p;
+        const acc_t pinv = 1.0 / p;
         #pragma unroll
         for (int i = 0;i < WARP_BATCH;++i) {
             if (i >= local_batches)
@@ -197,7 +197,7 @@ __global__ void softmax_warp_forward(input_t *dst, input_t *dst_orig, const outp
             for (int it = 0;it < WARP_ITERATIONS; ++it) {
                 int element_index = local_idx + it * WARP_SIZE;
                 if (element_index < element_count) {
-                    output_t d = elements[i][it] / sum[i];
+                    const output_t d = elements[i][it] / sum[i];
                     dst[i * element_count + it * WARP_SIZE] = (acc_t)d * ((acc_t)((m >> it) & 1) * pinv);
                     dst_orig[i * element_count + it * WARP_SIZE] = d;
                 }
@@ -413,7 +413,7 @@ __global__ void softmax_warp_backward(output_t *gradInput, const input_t *grad, 
         mask_reg[i] = mask[i * mask_stride + local_idx];
     }
     
-    acc_t pinv = 1 / p;
+    const acc_t pinv = 1.0 / p;
     
     #pragma unroll
     for (int i = 0;  i < WARP_BATCH;  ++i) {

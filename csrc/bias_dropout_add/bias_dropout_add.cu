@@ -30,7 +30,7 @@ __global__ void generate_dropout_mask_kernel(MaskType* output, IndexType n, uint
     MaskType mask = 0;
     #pragma unroll
     for (int i = 0; i < sizeof(MaskType) * 2; ++i) {
-        float4 rand = curand_uniform4(&state);
+        const float4 rand = curand_uniform4(&state);
         mask |= (((MaskType)(rand.x < p)) << (i * 4))
             | (((MaskType)(rand.y < p)) << (i * 4 + 1))
             | (((MaskType)(rand.z < p)) << (i * 4 + 2))
@@ -43,10 +43,10 @@ __global__ void generate_dropout_mask_kernel(MaskType* output, IndexType n, uint
 
 template <typename MaskType>
 void generate_dropout_mask(MaskType* mask, int bsz, int dim, float p, uint64_t seed, uint64_t offset) {
-    int mask_elements_per_batch = CELL(dim, sizeof(MaskType) * 8);
-    int num_elements = bsz * mask_elements_per_batch;
+    const int mask_elements_per_batch = CELL(dim, sizeof(MaskType) * 8);
+    const int num_elements = bsz * mask_elements_per_batch;
     const int block_size = 128;
-    int grid = CELL(num_elements, block_size);
+    const int grid = CELL(num_elements, block_size);
     generate_dropout_mask_kernel<MaskType, float, size_t><<<grid, block_size>>>(mask, num_elements, seed, offset, p);
 }
 
@@ -65,17 +65,17 @@ __global__ void bias_dropout_add_forward(output_t *dst, const input_t *x, const 
     const input_t *residual, const uint8_t *mask, index_t bsz, int dim, input_t pinv) {
     if (blockIdx.x < bsz) {
         if IF_CONSTEXPR (is_training) {
-            int mask_index = blockIdx.x * CELL(dim, 8);
-            uint8_t mask_offset = threadIdx.x % 8;
+            const int mask_index = blockIdx.x * CELL(dim, 8);
+            const uint8_t mask_offset = threadIdx.x % 8;
             for (int j = threadIdx.x; j < dim; j += blockDim.x) {
-                index_t idx = blockIdx.x * dim + j;
-                input_t y = x[idx] + bias[j];
-                input_t m = from_uint8<input_t>((mask[mask_index + j / 8] >> mask_offset) & 1);
+                const index_t idx = blockIdx.x * dim + j;
+                const input_t y = x[idx] + bias[j];
+                const input_t m = from_uint8<input_t>((mask[mask_index + j / 8] >> mask_offset) & 1);
                 dst[idx] = y * m * pinv + residual[idx];
             }
         } else {
             for (int j = threadIdx.x; j < dim; j += blockDim.x) {
-                index_t idx = blockIdx.x * dim + j;
+                const index_t idx = blockIdx.x * dim + j;
                 dst[idx] = x[idx] + bias[j] + residual[idx];
             }
         }
@@ -111,17 +111,17 @@ __global__ void bias_dropout_add_forward_vec(output_t *dst, const input_t *x, co
     using VecOutType = VecType<output_t>;
     if (blockIdx.x < bsz) {
         if IF_CONSTEXPR (is_training) {
-            int mask_index = blockIdx.x * CELL(dim, 8);
-            uint8_t mask_offset1 = (threadIdx.x * 2) % 8;
-            uint8_t mask_offset2 = (threadIdx.x * 2 + 1) % 8;
+            const int mask_index = blockIdx.x * CELL(dim, 8);
+            const uint8_t mask_offset1 = (threadIdx.x * 2) % 8;
+            const uint8_t mask_offset2 = (threadIdx.x * 2 + 1) % 8;
             for (int j = threadIdx.x * 2; j < dim; j += blockDim.x * 2) {
-                index_t idx = blockIdx.x * dim + j;
-                VecInType xi = *(VecInType *)(x + idx);
-                VecInType b = *(VecInType *)(bias + j);
-                VecInType r = *(VecInType *)(residual + idx);
-                uint8_t m = mask[mask_index + j / 8];
-                input_t m1 = from_uint8<input_t>((m >> mask_offset1) & 1);
-                input_t m2 = from_uint8<input_t>((m >> mask_offset2) & 1);
+                const index_t idx = blockIdx.x * dim + j;
+                const VecInType xi = *(VecInType *)(x + idx);
+                const VecInType b = *(VecInType *)(bias + j);
+                const VecInType r = *(VecInType *)(residual + idx);
+                const uint8_t m = mask[mask_index + j / 8];
+                const input_t m1 = from_uint8<input_t>((m >> mask_offset1) & 1);
+                const input_t m2 = from_uint8<input_t>((m >> mask_offset2) & 1);
                 VecOutType d;
                 d.x = (xi.x + b.x) * m1 * pinv + r.x;
                 d.y = (xi.y + b.y) * m2 * pinv + r.y;
@@ -129,10 +129,10 @@ __global__ void bias_dropout_add_forward_vec(output_t *dst, const input_t *x, co
             }
         } else {
             for (int j = threadIdx.x * 2; j < dim; j += blockDim.x * 2) {
-                index_t idx = blockIdx.x * dim + j;
-                VecInType xi = *(VecInType *)(x + idx);
-                VecInType b = *(VecInType *)(bias + j);
-                VecInType r = *(VecInType *)(residual + idx);
+                const index_t idx = blockIdx.x * dim + j;
+                const VecInType xi = *(VecInType *)(x + idx);
+                const VecInType b = *(VecInType *)(bias + j);
+                const VecInType r = *(VecInType *)(residual + idx);
                 VecOutType d;
                 d.x = xi.x + b.x + r.x;
                 d.y = xi.y + b.y + r.y;
@@ -145,10 +145,10 @@ __global__ void bias_dropout_add_forward_vec(output_t *dst, const input_t *x, co
 template <typename index_t, typename input_t, typename output_t>
 __global__ void bias_dropout_add_backward(output_t *dst, const input_t *grad, const uint8_t *mask, index_t bsz, int dim, input_t pinv) {
     if (blockIdx.x < bsz) {
-        int mask_index = blockIdx.x * CELL(dim, 8);
-        uint8_t mask_offset = threadIdx.x % 8;
+        const int mask_index = blockIdx.x * CELL(dim, 8);
+        const uint8_t mask_offset = threadIdx.x % 8;
         for (int j = threadIdx.x; j < dim; j += blockDim.x) {
-            index_t idx = blockIdx.x * dim + j;
+            const index_t idx = blockIdx.x * dim + j;
             uint8_t m = (mask[mask_index + j / 8] >> mask_offset) & 1;
             dst[idx] = grad[idx] * from_uint8<input_t>(m) * pinv;
         }
@@ -160,13 +160,13 @@ __global__ void bias_dropout_add_backward_vec(output_t *dst, const input_t *grad
     using VecInType = VecType<input_t>;
     using VecOutType = VecType<output_t>;
     if (blockIdx.x < bsz) {
-        int mask_index = blockIdx.x * CELL(dim, 8);
-        uint8_t mask_offset1 = (threadIdx.x * 2) % 8;
-        uint8_t mask_offset2 = (threadIdx.x * 2 + 1) % 8;
+        const int mask_index = blockIdx.x * CELL(dim, 8);
+        const uint8_t mask_offset1 = (threadIdx.x * 2) % 8;
+        const uint8_t mask_offset2 = (threadIdx.x * 2 + 1) % 8;
         for (int j = threadIdx.x * 2; j < dim; j += blockDim.x * 2) {
-            index_t idx = blockIdx.x * dim + j;
-            uint8_t m = mask[mask_index + j / 8];
-            VecInType g = *(VecInType *)(grad + idx);
+            const index_t idx = blockIdx.x * dim + j;
+            const uint8_t m = mask[mask_index + j / 8];
+            const VecInType g = *(VecInType *)(grad + idx);
             VecOutType d;
             d.x = g.x * from_uint8<input_t>((m >> mask_offset1) & 1) * pinv;
             d.y = g.y * from_uint8<input_t>((m >> mask_offset2) & 1) * pinv;
@@ -184,7 +184,7 @@ std::vector<c10::optional<torch::Tensor>> bias_dropout_add_forward_cuda(const to
     for (size_t i = 0; i + 1 < sizes.size(); ++i) {
         bsz *= sizes[i];
     }
-    int dim = sizes[sizes.size() - 1];
+    const int dim = sizes[sizes.size() - 1];
     auto dst_options = x.options().requires_grad(false);
     torch::Tensor results = torch::empty(sizes, dst_options);
     auto type = x.scalar_type();

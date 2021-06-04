@@ -33,15 +33,15 @@ __device__ acc_t fast_gelu(acc_t y) {
 template <typename acc_t>
 __device__ acc_t torch_gelu_back(acc_t y, acc_t g) {
     constexpr acc_t kBeta = M_2_SQRTPI * M_SQRT1_2 * 0.5;
-    acc_t cdf = normcdff(y);
-    acc_t pdf = expf(-0.5f * y * y) * kBeta;
+    const acc_t cdf = normcdff(y);
+    const acc_t pdf = expf(-0.5f * y * y) * kBeta;
     return g * (cdf + y * pdf);
 }
 
 template <typename acc_t>
 __device__ acc_t fast_gelu_back(acc_t y, acc_t g) {
-    acc_t tanh_out = tanhf(0.79788456 * y * (1 + 0.044715 * y * y));
-    acc_t ff = 0.5 * y * ((1 - tanh_out * tanh_out) * (0.79788456 + 0.1070322243 * y * y)) + 0.5 * (1 + tanh_out);
+    const acc_t tanh_out = tanhf(0.79788456 * y * (1 + 0.044715 * y * y));
+    const acc_t ff = 0.5 * y * ((1 - tanh_out * tanh_out) * (0.79788456 + 0.1070322243 * y * y)) + 0.5 * (1 + tanh_out);
     return ff * g;
 }
 
@@ -49,8 +49,8 @@ template <typename index_t, typename input_t, typename output_t, typename acc_t,
 __global__ void bias_gelu_forward(output_t *dst, const input_t *src, const input_t *bias, index_t bsz, int dim) {
     for (int j = threadIdx.x; j < dim; j += blockDim.x) {
         if (blockIdx.x < bsz) {
-            index_t idx = blockIdx.x * dim + j;
-            acc_t y = (acc_t)(src[idx] + bias[j]);
+            const index_t idx = blockIdx.x * dim + j;
+            const acc_t y = (acc_t)(src[idx] + bias[j]);
             dst[idx] = (output_t)gelu_func(y);
         }
     }
@@ -84,11 +84,11 @@ __global__ void bias_gelu_forward_vec(output_t *dst, const input_t *src, const i
     using VecOutType = VecType<output_t>;
     for (int j = threadIdx.x * 2; j < dim; j += blockDim.x * 2) {
         if (blockIdx.x < bsz) {
-            index_t idx = blockIdx.x * dim + j;
-            VecInType s = *(VecInType *)(src + idx);
-            VecInType b = *(VecInType *)(bias + j);
-            acc_t y1 = s.x + b.x;
-            acc_t y2 = s.y + b.y;
+            const index_t idx = blockIdx.x * dim + j;
+            const VecInType s = *(VecInType *)(src + idx);
+            const VecInType b = *(VecInType *)(bias + j);
+            const acc_t y1 = s.x + b.x;
+            const acc_t y2 = s.y + b.y;
             VecOutType d;
             d.x = gelu_func(y1);
             d.y = gelu_func(y2);
@@ -102,9 +102,9 @@ __global__ void bias_gelu_backward(output_t *dst, const input_t *src, const inpu
     const input_t *grad, index_t bsz, int dim) {
     for (int j = threadIdx.x; j < dim; j += blockDim.x) {
         if (blockIdx.x < bsz) {
-            index_t idx = blockIdx.x * dim + j;
-            acc_t y = (acc_t)(src[idx] + bias[j]);
-            acc_t g = grad[idx];
+            const index_t idx = blockIdx.x * dim + j;
+            const acc_t y = (acc_t)(src[idx] + bias[j]);
+            const acc_t g = grad[idx];
             dst[idx] = (output_t)gelu_back_func(y, g);
         }
     }
@@ -117,12 +117,12 @@ __global__ void bias_gelu_backward_vec(output_t *dst, const input_t *src, const 
     using VecOutType = VecType<output_t>;
     for (int j = threadIdx.x * 2; j < dim; j += blockDim.x * 2) {
         if (blockIdx.x < bsz) {
-            index_t idx = blockIdx.x * dim + j;
-            VecInType s = *(VecInType *)(src + idx);
-            VecInType b = *(VecInType *)(bias + j);
-            VecInType g = *(VecInType *)(grad + idx);
-            acc_t y1 = s.x + b.x;
-            acc_t y2 = s.y + b.y;
+            const index_t idx = blockIdx.x * dim + j;
+            const VecInType s = *(VecInType *)(src + idx);
+            const VecInType b = *(VecInType *)(bias + j);
+            const VecInType g = *(VecInType *)(grad + idx);
+            const acc_t y1 = s.x + b.x;
+            const acc_t y2 = s.y + b.y;
             VecOutType d;
             d.x = gelu_back_func(y1, g.x);
             d.y = gelu_back_func(y2, g.y);

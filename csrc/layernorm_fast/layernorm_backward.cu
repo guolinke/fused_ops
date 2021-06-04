@@ -70,14 +70,14 @@ void cuLoadWriteStridedInputs(
     U curr_mean = mean[i1];
     U curr_invvar = invvar[i1];
     for (int k = 0;  k < blockDim.y;  ++k) {
-      int i2 = i2_off + k;
-      int load_idx = i1*n2+i2;
-      int write_idx = thr_load_row_off*row_stride+thr_load_col_off+k;
+      const int i2 = i2_off + k;
+      const int load_idx = i1*n2+i2;
+      const int write_idx = thr_load_row_off*row_stride+thr_load_col_off+k;
       if (i2<n2) {
         U curr_input = static_cast<U>(input[load_idx]);
-    U curr_dout = static_cast<U>(dout[load_idx]);
-    warp_buf1[write_idx] = curr_dout;
-    warp_buf2[write_idx] = curr_dout * (curr_input - curr_mean) * curr_invvar;
+        U curr_dout = static_cast<U>(dout[load_idx]);
+        warp_buf1[write_idx] = curr_dout;
+        warp_buf2[write_idx] = curr_dout * (curr_input - curr_mean) * curr_invvar;
       } else {
         warp_buf1[write_idx] = U(0);
         warp_buf2[write_idx] = U(0);
@@ -85,7 +85,7 @@ void cuLoadWriteStridedInputs(
     }
   } else {
     for (int k = 0;  k < blockDim.y;  ++k) {
-      int write_idx = thr_load_row_off*row_stride+thr_load_col_off+k;
+      const int write_idx = thr_load_row_off*row_stride+thr_load_col_off+k;
       warp_buf1[write_idx] = U(0);
       warp_buf2[write_idx] = U(0);
     }
@@ -114,14 +114,14 @@ void cuLoadAddStridedInputs(
     U curr_mean = mean[i1];
     U curr_invvar = invvar[i1];
     for (int k = 0;  k < blockDim.y;  ++k) {
-      int i2 = i2_off + k;
-      int load_idx = i1*n2+i2;
-      int write_idx = thr_load_row_off*row_stride+thr_load_col_off+k;
+      const int i2 = i2_off + k;
+      const int load_idx = i1*n2+i2;
+      const int write_idx = thr_load_row_off*row_stride+thr_load_col_off+k;
       if (i2<n2) {
         U curr_input = static_cast<U>(input[load_idx]);
-    U curr_dout = static_cast<U>(dout[load_idx]);
-    warp_buf1[write_idx] += curr_dout;
-    warp_buf2[write_idx] += curr_dout * (curr_input - curr_mean) * curr_invvar;
+        U curr_dout = static_cast<U>(dout[load_idx]);
+        warp_buf1[write_idx] += curr_dout;
+        warp_buf2[write_idx] += curr_dout * (curr_input - curr_mean) * curr_invvar;
       }
     }
   }
@@ -164,8 +164,8 @@ void cuComputePartGradGammaBeta(
     U acc1 = U(0);
     U acc2 = U(0);
     for (int k = 0;  k < blockDim.y;  ++k) {
-      int row1 = threadIdx.y + k*blockDim.y;
-      int idx1 = row1*row_stride + threadIdx.x;
+      const int row1 = threadIdx.y + k*blockDim.y;
+      const int idx1 = row1*row_stride + threadIdx.x;
       acc1 += warp_buf1[idx1];
       acc2 += warp_buf2[idx1];
     }
@@ -175,21 +175,21 @@ void cuComputePartGradGammaBeta(
     // sum all warps
     for (int offset = blockDim.y/2;  offset > 1;  offset /= 2) {
       if (threadIdx.y < offset) {
-        int row1 = threadIdx.y;
-    int row2 = threadIdx.y + offset;
-    int idx1 = row1*row_stride + threadIdx.x;
-    int idx2 = row2*row_stride + threadIdx.x;
-    warp_buf1[idx1] += warp_buf1[idx2];
-    warp_buf2[idx1] += warp_buf2[idx2];
+        const int row1 = threadIdx.y;
+        const int row2 = threadIdx.y + offset;
+        const int idx1 = row1*row_stride + threadIdx.x;
+        const int idx2 = row2*row_stride + threadIdx.x;
+        warp_buf1[idx1] += warp_buf1[idx2];
+        warp_buf2[idx1] += warp_buf2[idx2];
       }
       __syncthreads();
     }
     int i2 = blockIdx.x * blockDim.x + threadIdx.x;
     if (threadIdx.y == 0 && i2 < n2) {
-      int row1 = threadIdx.y;
-      int row2 = threadIdx.y + 1;
-      int idx1 = row1*row_stride + threadIdx.x;
-      int idx2 = row2*row_stride + threadIdx.x;
+      const int row1 = threadIdx.y;
+      const int row2 = threadIdx.y + 1;
+      const int idx1 = row1*row_stride + threadIdx.x;
+      const int idx2 = row2*row_stride + threadIdx.x;
       part_grad_beta[blockIdx.y*n2+i2] = warp_buf1[idx1] + warp_buf1[idx2];
       part_grad_gamma[blockIdx.y*n2+i2] = warp_buf2[idx1] + warp_buf2[idx2];
     }

@@ -95,7 +95,7 @@ __global__ void layernorm_forward(output_t *dst, const input_t *src, const input
         for (int offset = Parameters::WarpSize / 2; offset > 0; offset /= 2) {
             var += __shfl_xor_sync(FullMask, var, offset, Parameters::WarpSize);
         }
-        acc_t rsigma = rsqrtf(var / Parameters::Dim + epsilon);
+        const acc_t rsigma = rsqrtf(var / Parameters::Dim + epsilon);
         
         #pragma unroll
         for (int i = 0; i < Parameters::Iterations * Parameters::VecSize; ++i) {
@@ -136,8 +136,8 @@ __global__ void layernorm_backward_x(output_t *dst, const input_t *input, const 
         input_t *elements_l = (input_t *)elements;
         input_t *grad_l = (input_t *)grad_reg;
         input_t *gamma_l = (input_t *)gamma_reg;
-        acc_t mu = mean[batch];
-        acc_t var = invvar[batch];
+        const acc_t mu = mean[batch];
+        const acc_t var = invvar[batch];
         constexpr uint32_t FullMask = 0xffffffff;
         
         acc_t sum1 = 0.0, sum2 = 0.0;
