@@ -49,8 +49,7 @@ __global__ void softmax_warp_forward(input_t *dst, input_t *dst_orig, const outp
     const int thread_offset = first_batch * stride + local_idx;
     constexpr int mask_stride = WARP_SIZE;
     if IF_CONSTEXPR (need_mask) {
-        const int seq_idx = (first_batch * mask_stride + local_idx) * offset;
-        curand_init(seed, seq_idx, offset, &state);
+        curand_init(seed, thread_offset, offset, &state);
     }
  
     // batch_size might not be a multiple of WARP_BATCH. Check how
