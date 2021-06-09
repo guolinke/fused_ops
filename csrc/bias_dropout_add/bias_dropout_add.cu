@@ -26,7 +26,7 @@ template <typename MaskType, typename acc_t, typename IndexType>
 __global__ void generate_dropout_mask_kernel(MaskType* output, IndexType n, uint64_t seed, uint64_t offset, acc_t p) {
     IndexType idx = blockIdx.x * blockDim.x + threadIdx.x;
     curandStatePhilox4_32_10_t state;
-    curand_init(seed, idx, offset, &state);
+    curand_init(seed, idx * sizeof(MaskType) * 8, offset, &state);
     MaskType mask = 0;
     #pragma unroll
     for (int i = 0; i < sizeof(MaskType) * 2; ++i) {
