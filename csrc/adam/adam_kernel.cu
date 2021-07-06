@@ -13,7 +13,7 @@
 
 template <typename T, typename GRAD_T>
 __global__ void adam_cuda_kernel(
-    T* __restrict__ p,
+    GRAD_T* __restrict__ p,
     T* __restrict__ m,
     T* __restrict__ v,
     const GRAD_T * __restrict__ g,
@@ -34,12 +34,12 @@ __global__ void adam_cuda_kernel(
 
     for (int j = i; j < tsize; j+=totThreads) {
         // weight decay
-        p[j] = p[j] * decay_size;
+        T cur_p = (T)p[j] * decay_size;
         T scaled_grad = static_cast<T>(g[j]) / grad_scale;
         m[j] = b1*m[j] + (1-b1)*scaled_grad;
         v[j] = b2*v[j] + (1-b2)*scaled_grad*scaled_grad;
         const float update = m[j] / (sqrtf(v[j]) + eps);
-        p[j] = p[j] - (step_size*update);
+        p[j] = cur_p - (step_size*update);
     }
 }
 
@@ -77,12 +77,12 @@ void fused_adam_cuda(
     cudaStream_t stream = at::cuda::getCurrentCUDAStream();
 
     if (g.scalar_type() == at::ScalarType::Half || g.scalar_type() == at::ScalarType::BFloat16) {
-        AT_ASSERTM(p.scalar_type() == at::ScalarType::Float, "expected parameter to be of float type");
+        AT_ASSERTM(p.scalar_type() == g.scalar_type(), "expected parameter to be the same type as grad");
         using namespace at; // prevents "toString is undefined" errors
         DISPATCH_FLOAT_AND_HALF_AND_BF16(g.scalar_type(), 0, "adam_cuda_kernel",
             using accscalar_t = at::acc_type<scalar_t_0, true>;
             adam_cuda_kernel<accscalar_t, scalar_t_0><<<blocks,threadsPerBlock, 0, stream>>>(
-                    p.DATA_PTR<accscalar_t>(),
+                    p.DATA_PTR<scalar_t_0>(),
                     m.DATA_PTR<accscalar_t>(),
                     v.DATA_PTR<accscalar_t>(),
                     g.DATA_PTR<scalar_t_0>(),
