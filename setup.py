@@ -38,8 +38,8 @@ print("\n\ntorch.__version__  = {}\n\n".format(torch.__version__))
 TORCH_MAJOR = int(torch.__version__.split('.')[0])
 TORCH_MINOR = int(torch.__version__.split('.')[1])
 
-if TORCH_MAJOR == 0 and TORCH_MINOR < 4:
-      raise RuntimeError("Requires Pytorch 0.4 or newer.\n" +
+if not (TORCH_MAJOR >= 1 and TORCH_MINOR >= 4):
+      raise RuntimeError("Requires Pytorch 1.4 or newer.\n" +
                          "The latest stable release can be obtained from https://pytorch.org/")
 
 cmdclass = {}
@@ -72,18 +72,6 @@ def check_cuda_torch_binary_vs_bare_metal(cuda_dir):
                            "Pytorch binaries were compiled with Cuda {}.\n".format(torch.version.cuda))
 
 
-version_ge_1_1 = []
-if (TORCH_MAJOR > 1) or (TORCH_MAJOR == 1 and TORCH_MINOR > 0):
-    version_ge_1_1 = ['-DVERSION_GE_1_1']
-version_ge_1_3 = []
-if (TORCH_MAJOR > 1) or (TORCH_MAJOR == 1 and TORCH_MINOR > 2):
-    version_ge_1_3 = ['-DVERSION_GE_1_3']
-version_ge_1_5 = []
-if (TORCH_MAJOR > 1) or (TORCH_MAJOR == 1 and TORCH_MINOR > 4):
-    version_ge_1_5 = ['-DVERSION_GE_1_5']
-version_dependent_macros = version_ge_1_1 + version_ge_1_3 + version_ge_1_5
-
-
 from torch.utils.cpp_extension import CUDAExtension
 
 from torch.utils.cpp_extension import BuildExtension
@@ -99,52 +87,28 @@ ext_modules.append(
                     sources=['csrc/xentropy/interface.cpp',
                             'csrc/xentropy/xentropy_kernel.cu'],
                     include_dirs=[os.path.join(this_dir, 'csrc')],
-                    extra_compile_args={'cxx': ['-O3'] + version_dependent_macros,
-                                        'nvcc':['-O3'] + version_dependent_macros}))
-
-# ext_modules.append(
-#     CUDAExtension(name='fused_layernorm_cuda',
-#                     sources=['csrc/layernorm/interface.cpp',
-#                             'csrc/layernorm/layernorm_kernel.cu'],
-#                     include_dirs=[os.path.join(this_dir, 'csrc')],
-#                     extra_compile_args={'cxx': ['-O3'] + version_dependent_macros,
-#                                         'nvcc':['-maxrregcount=50', '-O3', '--use_fast_math'] + version_dependent_macros}))
+                    extra_compile_args={'cxx': ['-O3'],
+                                        'nvcc':['-O3']}))
 
 ext_modules.append(
     CUDAExtension(name='fused_adam_cuda_v2',
                     sources=['csrc/adam/interface.cpp',
                             'csrc/adam/adam_kernel.cu'],
                     include_dirs=[os.path.join(this_dir, 'csrc')],
-                    extra_compile_args={'cxx': ['-O3'] + version_dependent_macros,
-                                        'nvcc':['-O3', '--use_fast_math'] + version_dependent_macros}))
+                    extra_compile_args={'cxx': ['-O3'],
+                                        'nvcc':['-O3', '--use_fast_math']}))
 
 generator_flag = []
 torch_dir = torch.__path__[0]
 if os.path.exists(os.path.join(torch_dir, 'include', 'ATen', 'CUDAGenerator.h')):
     generator_flag = ['-DOLD_GENERATOR']
 
-# ext_modules.append(
-#     CUDAExtension(name='fused_softmax_dropout_cuda',
-#                     sources=['csrc/softmax_dropout/interface.cpp',
-#                             'csrc/softmax_dropout/softmax_dropout_kernel.cu'],
-#                     include_dirs=[os.path.join(this_dir, 'csrc')],
-#                     extra_compile_args={'cxx': ['-O3',] + version_dependent_macros + generator_flag,
-#                                         'nvcc':['-O3', '--use_fast_math',
-#                                                 '-gencode', 'arch=compute_70,code=sm_70',
-#                                                 '-gencode', 'arch=compute_80,code=sm_80',
-#                                                 '-U__CUDA_NO_HALF_OPERATORS__',
-#                                                 '-U__CUDA_NO_BFLOAT16_OPERATORS__',
-#                                                 '-U__CUDA_NO_HALF_CONVERSIONS__',
-#                                                 '-U__CUDA_NO_BFLOAT16_CONVERSIONS__',
-#                                                 '--expt-relaxed-constexpr',
-#                                                 '--expt-extended-lambda'] + version_dependent_macros + generator_flag}))
-
 ext_modules.append(
     CUDAExtension(name='fused_softmax_dropout_fast_cuda',
-                    sources=['csrc/softmax_dropout_fast/interface.cpp',
-                            'csrc/softmax_dropout_fast/softmax_dropout_kernel.cu'],
+                    sources=['csrc/softmax_dropout/interface.cpp',
+                            'csrc/softmax_dropout/softmax_dropout_kernel.cu'],
                     include_dirs=[os.path.join(this_dir, 'csrc')],
-                    extra_compile_args={'cxx': ['-O3',] + version_dependent_macros + generator_flag,
+                    extra_compile_args={'cxx': ['-O3',] + generator_flag,
                                         'nvcc':['-O3', '--use_fast_math',
                                                 '-gencode', 'arch=compute_70,code=sm_70',
                                                 '-gencode', 'arch=compute_80,code=sm_80',
@@ -153,14 +117,14 @@ ext_modules.append(
                                                 '-U__CUDA_NO_HALF_CONVERSIONS__',
                                                 '-U__CUDA_NO_BFLOAT16_CONVERSIONS__',
                                                 '--expt-relaxed-constexpr',
-                                                '--expt-extended-lambda'] + version_dependent_macros + generator_flag}))
+                                                '--expt-extended-lambda'] + generator_flag}))
 
 ext_modules.append(
     CUDAExtension(name='fused_bias_gelu_cuda',
                     sources=['csrc/bias_gelu/interface.cpp',
                             'csrc/bias_gelu/bias_gelu.cu'],
                     include_dirs=[os.path.join(this_dir, 'csrc')],
-                    extra_compile_args={'cxx': ['-O3',] + version_dependent_macros + generator_flag,
+                    extra_compile_args={'cxx': ['-O3',] + generator_flag,
                                         'nvcc':['-O3', '--use_fast_math', 
                                                 '-gencode', 'arch=compute_70,code=sm_70',
                                                 '-gencode', 'arch=compute_80,code=sm_80',
@@ -169,14 +133,14 @@ ext_modules.append(
                                                 '-U__CUDA_NO_HALF_CONVERSIONS__',
                                                 '-U__CUDA_NO_BFLOAT16_CONVERSIONS__',
                                                 '--expt-relaxed-constexpr',
-                                                '--expt-extended-lambda'] + version_dependent_macros + generator_flag}))
+                                                '--expt-extended-lambda'] + generator_flag}))
 
 ext_modules.append(
     CUDAExtension(name='fused_bias_dropout_add_cuda',
                     sources=['csrc/bias_dropout_add/interface.cpp',
                             'csrc/bias_dropout_add/bias_dropout_add.cu'],
                     include_dirs=[os.path.join(this_dir, 'csrc')],
-                    extra_compile_args={'cxx': ['-O3',] + version_dependent_macros + generator_flag,
+                    extra_compile_args={'cxx': ['-O3',] + generator_flag,
                                         'nvcc':['-O3', '--use_fast_math', 
                                                 '-gencode', 'arch=compute_70,code=sm_70',
                                                 '-gencode', 'arch=compute_80,code=sm_80',
@@ -185,14 +149,14 @@ ext_modules.append(
                                                 '-U__CUDA_NO_HALF_CONVERSIONS__',
                                                 '-U__CUDA_NO_BFLOAT16_CONVERSIONS__',
                                                 '--expt-relaxed-constexpr',
-                                                '--expt-extended-lambda'] + version_dependent_macros + generator_flag}))
+                                                '--expt-extended-lambda'] + generator_flag}))
 
 ext_modules.append(
     CUDAExtension(name='fused_layernorm_fast_cuda',
-                    sources=['csrc/layernorm_fast/interface.cpp',
-                            'csrc/layernorm_fast/layernorm.cu'],
+                    sources=['csrc/layernorm/interface.cpp',
+                            'csrc/layernorm/layernorm.cu'],
                     include_dirs=[os.path.join(this_dir, 'csrc')],
-                    extra_compile_args={'cxx': ['-O3',] + version_dependent_macros + generator_flag,
+                    extra_compile_args={'cxx': ['-O3',] + generator_flag,
                                         'nvcc':['-O3', '--use_fast_math',
                                                 '-gencode', 'arch=compute_70,code=sm_70',
                                                 '-gencode', 'arch=compute_80,code=sm_80',
@@ -201,14 +165,14 @@ ext_modules.append(
                                                 '-U__CUDA_NO_HALF_CONVERSIONS__',
                                                 '-U__CUDA_NO_BFLOAT16_CONVERSIONS__',
                                                 '--expt-relaxed-constexpr',
-                                                '--expt-extended-lambda'] + version_dependent_macros + generator_flag}))
+                                                '--expt-extended-lambda'] + generator_flag}))
 
 ext_modules.append(
     CUDAExtension(name='fused_layernorm_backward_gamma_beta_cuda',
-                    sources=['csrc/layernorm_fast/interface_gamma_beta.cpp',
-                            'csrc/layernorm_fast/layernorm_backward.cu'],
+                    sources=['csrc/layernorm/interface_gamma_beta.cpp',
+                            'csrc/layernorm/layernorm_backward.cu'],
                     include_dirs=[os.path.join(this_dir, 'csrc')],
-                    extra_compile_args={'cxx': ['-O3',] + version_dependent_macros + generator_flag,
+                    extra_compile_args={'cxx': ['-O3',] + generator_flag,
                                         'nvcc':['-O3', '--use_fast_math', '-maxrregcount=50',
                                                 '-gencode', 'arch=compute_70,code=sm_70',
                                                 '-gencode', 'arch=compute_80,code=sm_80',
@@ -217,7 +181,7 @@ ext_modules.append(
                                                 '-U__CUDA_NO_HALF_CONVERSIONS__',
                                                 '-U__CUDA_NO_BFLOAT16_CONVERSIONS__',
                                                 '--expt-relaxed-constexpr',
-                                                '--expt-extended-lambda'] + version_dependent_macros + generator_flag}))
+                                                '--expt-extended-lambda'] + generator_flag}))
 
 setup(
     name='fused_ops',
