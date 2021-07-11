@@ -5,12 +5,12 @@ import warnings
 from . import *
 from .bias_dropout_add import *
 from .bias_gelu import *
-from .layernorm_fast import *
-from .softmax_dropout_fast import *
+from .layernorm import *
+from .softmax_dropout import *
 from .xentropy import *
 del bias_gelu
-del layernorm_fast
-del softmax_dropout_fast
+del layernorm
+del softmax_dropout
 del xentropy
 del torch
 del warnings

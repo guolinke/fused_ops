@@ -21,7 +21,5 @@ class SoftmaxDropoutFast(torch.autograd.Function):
             dropout_mask, dropout_prob)
         return None, None, grad_input, None
 
-softmax_dropout_fast_func = SoftmaxDropoutFast.apply
-
 def softmax_dropout(input, dropout_prob, is_training=True):
-    return softmax_dropout_fast_func(is_training, input, dropout_prob)
+    return SoftmaxDropoutFast.apply(is_training, input, dropout_prob)
