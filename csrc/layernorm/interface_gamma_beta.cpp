@@ -6,7 +6,6 @@ namespace {
 void compute_n1_n2(
     at::Tensor input,
     at::IntArrayRef normalized_shape,
-    #endif
     int& n1,
     int& n2)
 {
