@@ -275,20 +275,20 @@ void HostLayerNormGradient(
       at::Tensor part_grad_beta = at::empty_like(part_grad_gamma);
       cuComputePartGradGammaBeta<<<blocks2, threads2, nshared2, stream>>>(
               dout,
-              input->data_prt<T>(),
+              input->data_ptr<T>(),
               n1,n2,
               mean,
               invvar,
               U(epsilon),
-              part_grad_gamma.data_prt<U>(),
-              part_grad_beta.data_prt<U>());
+              part_grad_gamma.data_ptr<U>(),
+              part_grad_beta.data_ptr<U>());
 
       const dim3 threads3(32,8,1);
       const dim3 blocks3((n2+threads2.x-1)/threads2.x,1,1);
       const int nshared3 = threads3.x * threads3.y * sizeof(U);
       cuComputeGradGammaBeta<<<blocks3, threads3, nshared3, stream>>>(
-              part_grad_gamma.data_prt<U>(),
-              part_grad_beta.data_prt<U>(),
+              part_grad_gamma.data_ptr<U>(),
+              part_grad_beta.data_ptr<U>(),
               part_size,
               n1,n2,
               grad_gamma,
@@ -314,17 +314,17 @@ void cuda_layer_norm_gradient(
     DISPATCH_DOUBLE_FLOAT_AND_HALF_AND_BF16(input->scalar_type(), 0, "cuComputeGradInput",
         using accscalar_t = at::acc_type<scalar_t_0, true>;
         HostLayerNormGradient(
-        dout->data_prt<scalar_t_0>(),
-        mean->data_prt<accscalar_t>(),
-        invvar->data_prt<accscalar_t>(),
+        dout->data_ptr<scalar_t_0>(),
+        mean->data_ptr<accscalar_t>(),
+        invvar->data_ptr<accscalar_t>(),
         input,
         n1,n2,
             // TMJ pass NULL argument for gamma, beta, grad_gamma and grad_beta
             // if gamma Tensor is NULL on input.
-        gamma->data_prt<scalar_t_0>(),
-        beta->data_prt<scalar_t_0>(),
+        gamma->data_ptr<scalar_t_0>(),
+        beta->data_ptr<scalar_t_0>(),
         epsilon,
-        grad_gamma->data_prt<scalar_t_0>(),
-        grad_beta->data_prt<scalar_t_0>());
+        grad_gamma->data_ptr<scalar_t_0>(),
+        grad_beta->data_ptr<scalar_t_0>());
       )
 }

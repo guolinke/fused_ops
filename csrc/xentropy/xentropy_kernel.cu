@@ -600,15 +600,15 @@ std::vector<Tensor> host_bf16_softmax_xentropy(
     if (!bf16_to_float) {
       cunn_SoftMaxXEntropyForward<ILP, scalar_t_0, accscalar_t, scalar_t_0, Epilogue>
         <<<grid, block, 2 * block.x * sizeof(accscalar_t), stream>>>(
-          losses.data_prt<accscalar_t>(), max_log_sum_exp.data_prt<scalar_t_0>(),
-          input.data_prt<scalar_t_0>(), labels_.data_prt<int64_t>(),
+          losses.data_ptr<accscalar_t>(), max_log_sum_exp.data_ptr<scalar_t_0>(),
+          input.data_ptr<scalar_t_0>(), labels_.data_ptr<int64_t>(),
           dim_size
       );
     } else {
       cunn_SoftMaxXEntropyForward<ILP, scalar_t_0, accscalar_t, accscalar_t, Epilogue>
         <<<grid, block, 2 * block.x * sizeof(accscalar_t), stream>>>(
-          losses.data_prt<accscalar_t>(), max_log_sum_exp.data_prt<accscalar_t>(),
-          input.data_prt<scalar_t_0>(), labels_.data_prt<int64_t>(),
+          losses.data_ptr<accscalar_t>(), max_log_sum_exp.data_ptr<accscalar_t>(),
+          input.data_ptr<scalar_t_0>(), labels_.data_ptr<int64_t>(),
           dim_size
       );
     }
@@ -668,15 +668,15 @@ std::vector<Tensor> host_softmax_xentropy(
     if (!half_to_float) {
       cunn_SoftMaxXEntropyForward<ILP, scalar_t_0, accscalar_t, scalar_t_0, Epilogue>
         <<<grid, block, 2 * block.x * sizeof(accscalar_t), stream>>>(
-          losses.data_prt<accscalar_t>(), max_log_sum_exp.data_prt<scalar_t_0>(),
-          input.data_prt<scalar_t_0>(), labels_.data_prt<int64_t>(),
+          losses.data_ptr<accscalar_t>(), max_log_sum_exp.data_ptr<scalar_t_0>(),
+          input.data_ptr<scalar_t_0>(), labels_.data_ptr<int64_t>(),
           dim_size
       );
     } else {
       cunn_SoftMaxXEntropyForward<ILP, scalar_t_0, accscalar_t, accscalar_t, Epilogue>
         <<<grid, block, 2 * block.x * sizeof(accscalar_t), stream>>>(
-          losses.data_prt<accscalar_t>(), max_log_sum_exp.data_prt<accscalar_t>(),
-          input.data_prt<scalar_t_0>(), labels_.data_prt<int64_t>(),
+          losses.data_ptr<accscalar_t>(), max_log_sum_exp.data_ptr<accscalar_t>(),
+          input.data_ptr<scalar_t_0>(), labels_.data_ptr<int64_t>(),
           dim_size
       );
     }
@@ -740,17 +740,17 @@ Tensor host_softmax_xentropy_backward(
     if (!half_to_float) {
       cunn_SoftMaxXEntropyBackward<ILP, scalar_t_0, accscalar_t, scalar_t_0, Epilogue>
        <<<grid, block, block.x * sizeof(accscalar_t), stream>>>(
-          gI.data_prt<scalar_t_0>(), logits.data_prt<scalar_t_0>(),
-          max_log_sum_exp.data_prt<scalar_t_0>(),
-          grad.data_prt<scalar_t_0>(), labels.data_prt<int64_t>(),
+          gI.data_ptr<scalar_t_0>(), logits.data_ptr<scalar_t_0>(),
+          max_log_sum_exp.data_ptr<scalar_t_0>(),
+          grad.data_ptr<scalar_t_0>(), labels.data_ptr<int64_t>(),
           dim_size
       );
     } else {
       cunn_SoftMaxXEntropyBackward<ILP, scalar_t_0, accscalar_t, accscalar_t, Epilogue>
        <<<grid, block, block.x * sizeof(accscalar_t), stream>>>(
-          gI.data_prt<scalar_t_0>(), logits.data_prt<scalar_t_0>(),
-          max_log_sum_exp.data_prt<accscalar_t>(),
-          grad.data_prt<accscalar_t>(), labels.data_prt<int64_t>(),
+          gI.data_ptr<scalar_t_0>(), logits.data_ptr<scalar_t_0>(),
+          max_log_sum_exp.data_ptr<accscalar_t>(),
+          grad.data_ptr<accscalar_t>(), labels.data_ptr<int64_t>(),
           dim_size
       );
     }
