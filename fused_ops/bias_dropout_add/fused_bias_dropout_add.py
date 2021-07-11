@@ -23,3 +23,8 @@ class BiasDropoutAddFunction(torch.autograd.Function):
         else:
             grad_input_bias = grad_input
         return grad_input, grad_input_bias, grad_output, None, None
+
+bias_dropout_add_func = BiasDropoutAddFunction.apply
+
+def bias_dropout_add(input, bias, residual, dropout_prob, is_training=True):
+    return bias_dropout_add_func(input, bias, residual, is_training, dropout_prob)

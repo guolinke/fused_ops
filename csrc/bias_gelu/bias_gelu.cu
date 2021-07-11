@@ -7,18 +7,10 @@
 #include <cuda_runtime.h>
 #include <cuda_fp16.h>
 #include <cuda_bf16.h>
-#include <cuda_profiler_api.h>
-#include "THC/THC.h"
 #include <ATen/cuda/CUDAContext.h>
 #include <torch/extension.h>
 #include <math.h>
-
-#define CELL(a, b) (((a) + (b) - 1) / (b))
-#if __cplusplus >= 201703L
-    #define IF_CONSTEXPR constexpr
-#else
-    #define IF_CONSTEXPR
-#endif
+#include "util.h"
 
 template <typename acc_t>
 __device__ acc_t torch_gelu(acc_t y) {
@@ -56,32 +48,10 @@ __global__ void bias_gelu_forward(output_t *dst, const input_t *src, const input
     }
 }
 
-template <typename T>
-struct VecTypeImpl;
-
-template <>
-struct VecTypeImpl<half> {
-    using type = half2;
-};
-
-
-template <>
-struct VecTypeImpl<nv_bfloat16> {
-    using type = nv_bfloat162;
-};
-
-template <>
-struct VecTypeImpl<float> {
-    using type = float2;
-};
-
-template <typename T>
-using VecType = typename VecTypeImpl<T>::type;
-
 template <typename index_t, typename input_t, typename output_t, typename acc_t, acc_t (*gelu_func)(acc_t)>
 __global__ void bias_gelu_forward_vec(output_t *dst, const input_t *src, const input_t *bias, index_t bsz, int dim) {
-    using VecInType = VecType<input_t>;
-    using VecOutType = VecType<output_t>;
+    using VecInType = VecType<input_t, 2>;
+    using VecOutType = VecType<output_t, 2>;
     for (int j = threadIdx.x * 2; j < dim; j += blockDim.x * 2) {
         if (blockIdx.x < bsz) {
             const index_t idx = blockIdx.x * dim + j;
@@ -113,8 +83,8 @@ __global__ void bias_gelu_backward(output_t *dst, const input_t *src, const inpu
 template <typename index_t, typename input_t, typename output_t, typename acc_t, acc_t (*gelu_back_func)(acc_t, acc_t)>
 __global__ void bias_gelu_backward_vec(output_t *dst, const input_t *src, const input_t *bias,
     const input_t *grad, index_t bsz, int dim) {
-    using VecInType = VecType<input_t>;
-    using VecOutType = VecType<output_t>;
+    using VecInType = VecType<input_t, 2>;
+    using VecOutType = VecType<output_t, 2>;
     for (int j = threadIdx.x * 2; j < dim; j += blockDim.x * 2) {
         if (blockIdx.x < bsz) {
             const index_t idx = blockIdx.x * dim + j;
@@ -144,7 +114,7 @@ torch::Tensor bias_gelu_forward_cuda(const torch::Tensor &x, const torch::Tensor
     torch::Tensor results = torch::empty(sizes, dst_options);
     auto type = x.scalar_type();
     const int ThreadsPerBlock = 256;
-    int ThreadsPerBlockVec = CELL(dim, 256) * 256 % 512 == 0 ? 256 : 128;
+    int ThreadsPerBlockVec = DIV_CELL(dim, 256) * 256 % 512 == 0 ? 256 : 128;
     if (type == at::ScalarType::BFloat16) {
         if (dim % 2 == 0) {
             bias_gelu_forward_vec<size_t, nv_bfloat16, nv_bfloat16, float, gelu_func><<<bsz, ThreadsPerBlockVec, 0, stream>>>(
@@ -201,7 +171,7 @@ torch::Tensor bias_gelu_backward_cuda(const torch::Tensor &x, const torch::Tenso
     torch::Tensor results = torch::empty(sizes, dst_options);
     auto type = x.scalar_type();
     const int ThreadsPerBlock = 256;
-    int ThreadsPerBlockVec = CELL(dim, 256) * 256 % 512 == 0 ? 256 : 128;
+    int ThreadsPerBlockVec = DIV_CELL(dim, 256) * 256 % 512 == 0 ? 256 : 128;
     if (type == at::ScalarType::BFloat16) {
         if (dim % 2 == 0) {
             bias_gelu_backward_vec<size_t, nv_bfloat16, nv_bfloat16, float, gelu_back_func><<<bsz, ThreadsPerBlockVec, 0, stream>>>(

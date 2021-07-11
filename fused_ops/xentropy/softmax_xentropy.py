@@ -27,3 +27,5 @@ class SoftmaxCrossEntropyLoss(torch.autograd.Function):
             labels)
 
         return grad_logits, None, None, None, None
+
+softmax_cross_entropy_loss = SoftmaxCrossEntropyLoss.apply
