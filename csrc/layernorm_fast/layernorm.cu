@@ -2,15 +2,10 @@
 #include "ATen/ATen.h"
 #include "ATen/AccumulateType.h"
 #include "ATen/cuda/CUDAContext.h"
-#include <THC/THCDeviceUtils.cuh>
-
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <cuda_bf16.h>
-
-#include "type_shim.h"
-
-#define CELL(a, b) (((a) + (b) - 1) / (b))
+#include "util.h"
 
 template <int Dim_, int VecSize_, int BatchesPerBlock_, int WarpsForOneBatchPerBlock_>
 struct LNParameters {
@@ -26,28 +21,6 @@ struct LNParameters {
     static_assert(Dim == WarpsForOneBatchPerBlock * WarpStride * Iterations, "");
     static_assert(Dim == BatchStride * WarpsForOneBatchPerBlock, "");
 };
-
-template <typename T, int N>
-struct VecTypeImpl;
-
-#define DEFINE_VEC_TYPE(t, n, tn) \
-template <> \
-struct VecTypeImpl<t, n> { \
-    using type = tn; \
-};
-
-DEFINE_VEC_TYPE(half, 1, half)
-DEFINE_VEC_TYPE(__nv_bfloat16, 1, __nv_bfloat16)
-DEFINE_VEC_TYPE(float, 1, float)
-DEFINE_VEC_TYPE(half, 2, half2)
-DEFINE_VEC_TYPE(__nv_bfloat16, 2, __nv_bfloat162)
-DEFINE_VEC_TYPE(float, 2, float2)
-DEFINE_VEC_TYPE(half, 4, uint64_t)
-DEFINE_VEC_TYPE(__nv_bfloat16, 4, uint64_t)
-DEFINE_VEC_TYPE(float, 4, float4)
-
-template <typename T, int N>
-using VecType = typename VecTypeImpl<T, N>::type;
 
 template <typename IndexType, typename input_t, typename output_t, typename acc_t, typename Parameters>
 __global__ void layernorm_forward(output_t *dst, const input_t *src, const input_t *gamma, const input_t *beta,
@@ -78,10 +51,9 @@ __global__ void layernorm_forward(output_t *dst, const input_t *src, const input
         for (int i = 0; i < Parameters::Iterations * Parameters::VecSize; ++i) {
             sum += (acc_t)elements_l[i];
         }
-        constexpr uint32_t FullMask = 0xffffffff;
         #pragma unroll
         for (int offset = Parameters::WarpSize / 2; offset > 0; offset /= 2) {
-            sum += __shfl_xor_sync(FullMask, sum, offset, Parameters::WarpSize);
+            sum += SHFL_XOR(sum, offset, Parameters::WarpSize);
         }
         
         acc_t mu = sum / Parameters::Dim;
@@ -93,7 +65,7 @@ __global__ void layernorm_forward(output_t *dst, const input_t *src, const input
         }
         #pragma unroll
         for (int offset = Parameters::WarpSize / 2; offset > 0; offset /= 2) {
-            var += __shfl_xor_sync(FullMask, var, offset, Parameters::WarpSize);
+            var += SHFL_XOR(var, offset, Parameters::WarpSize);
         }
         const acc_t rsigma = rsqrtf(var / Parameters::Dim + epsilon);
         
@@ -138,7 +110,6 @@ __global__ void layernorm_backward_x(output_t *dst, const input_t *input, const 
         input_t *gamma_l = (input_t *)gamma_reg;
         const acc_t mu = mean[batch];
         const acc_t var = invvar[batch];
-        constexpr uint32_t FullMask = 0xffffffff;
         
         acc_t sum1 = 0.0, sum2 = 0.0;
         #pragma unroll
@@ -150,12 +121,12 @@ __global__ void layernorm_backward_x(output_t *dst, const input_t *input, const 
         
         #pragma unroll
         for (int offset = Parameters::WarpSize / 2; offset > 0; offset /= 2) {
-            sum1 += __shfl_xor_sync(FullMask, sum1, offset, Parameters::WarpSize);
+            sum1 += SHFL_XOR(sum1, offset, Parameters::WarpSize);
         }
         
         #pragma unroll
         for (int offset = Parameters::WarpSize / 2; offset > 0; offset /= 2) {
-            sum2 += __shfl_xor_sync(FullMask, sum2, offset, Parameters::WarpSize);
+            sum2 += SHFL_XOR(sum2, offset, Parameters::WarpSize);
         }
         
         sum1 *= var * var * var / Parameters::Dim;
@@ -176,8 +147,9 @@ __global__ void layernorm_backward_x(output_t *dst, const input_t *input, const 
 #define LAUNCH_FORWARD_KERNEL(len, vec, batches, type) \
 { \
     dim3 threads(32, batches); \
-    int blocks = CELL(n1, batches); \
-    layernorm_forward<size_t, type, type, float, LNParameters<len, vec, batches, 1>><<<blocks, threads, 0, stream>>> \
+    int blocks = DIV_CELL(n1, batches); \
+    layernorm_forward<size_t, type, type, float, LNParameters<len, vec, batches, 1>> \
+    <<<blocks, threads, 0, stream>>> \
     ((type *)output->data_ptr(), (type *)input->data_ptr(), (type *)gamma->data_ptr(), \
         (type *)beta->data_ptr(), (float *)mean->data_ptr(), (float *)invvar->data_ptr(), n1, epsilon); \
     break; \
@@ -186,10 +158,11 @@ __global__ void layernorm_backward_x(output_t *dst, const input_t *input, const 
 #define LAUNCH_BACKWARD_KERNEL(len, vec, batches, type) \
 { \
     dim3 threads(32, batches); \
-    int blocks = CELL(n1, batches); \
-    layernorm_backward_x<size_t, type, type, float, LNParameters<len, vec, batches, 1>><<<blocks, threads, 0, stream>>> \
-    ((type *)grad_input->data_ptr(), (type *)input->data_ptr(), (type *)dout->data_ptr(), (type *)gamma->data_ptr(), \
-        (float *)mean->data_ptr(), (float *)invvar->data_ptr(), n1); \
+    int blocks = DIV_CELL(n1, batches); \
+    layernorm_backward_x<size_t, type, type, float, LNParameters<len, vec, batches, 1>> \
+    <<<blocks, threads, 0, stream>>> \
+    ((type *)grad_input->data_ptr(), (type *)input->data_ptr(), (type *)dout->data_ptr(), \
+        (type *)gamma->data_ptr(), (float *)mean->data_ptr(), (float *)invvar->data_ptr(), n1); \
     break; \
 }
 

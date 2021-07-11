@@ -41,3 +41,6 @@ class BiasFastGeLUFunction(torch.autograd.Function):
         else:
             grad_input_bias = grad_input
         return grad_input, grad_input_bias
+
+bias_torch_gelu = BiasTorchGeLUFunction.apply
+bias_fast_gelu = BiasFastGeLUFunction.apply

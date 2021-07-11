@@ -8,8 +8,15 @@ extern torch::Tensor (*bias_gelu_fast_forward_cuda)(const torch::Tensor &x, cons
 extern torch::Tensor (*bias_gelu_torch_backward_cuda)(const torch::Tensor &x, const torch::Tensor &bias, const torch::Tensor &grad);
 extern torch::Tensor (*bias_gelu_fast_backward_cuda)(const torch::Tensor &x, const torch::Tensor &bias, const torch::Tensor &grad);
 
+// C++ interface
+
+#define CHECK_CUDA(x) AT_ASSERTM(x.is_cuda(), #x " must be a CUDA tensor")
+#define CHECK_CONTIGUOUS(x) AT_ASSERTM(x.is_contiguous(), #x " must be contiguous")
+#define CHECK_INPUT(x) CHECK_CUDA(x); CHECK_CONTIGUOUS(x)
+
 torch::Tensor bias_gelu_torch_forward(const torch::Tensor &x, const torch::Tensor &bias) {
-    AT_ASSERTM(x.is_contiguous(), "input must be contiguous");
+    CHECK_INPUT(x);
+    CHECK_INPUT(bias);
     AT_ASSERTM(bias.dim() == 1, "expected 1D tensor");
     AT_ASSERTM(bias.size(-1) == x.size(-1), "the dimension of bias and the last dimension of the input should be the same");
     AT_ASSERTM(x.scalar_type() == bias.scalar_type(), "the types mismatch");
@@ -17,7 +24,8 @@ torch::Tensor bias_gelu_torch_forward(const torch::Tensor &x, const torch::Tenso
 }
 
 torch::Tensor bias_gelu_fast_forward(const torch::Tensor &x, const torch::Tensor &bias) {
-    AT_ASSERTM(x.is_contiguous(), "input must be contiguous");
+    CHECK_INPUT(x);
+    CHECK_INPUT(bias);
     AT_ASSERTM(bias.dim() == 1, "expected 1D tensor");
     AT_ASSERTM(bias.size(-1) == x.size(-1), "the dimension of bias and the last dimension of the input should be the same");
     AT_ASSERTM(x.scalar_type() == bias.scalar_type(), "the types mismatch");
@@ -25,7 +33,8 @@ torch::Tensor bias_gelu_fast_forward(const torch::Tensor &x, const torch::Tensor
 }
 
 torch::Tensor bias_gelu_torch_backward(const torch::Tensor &x, const torch::Tensor &bias, const torch::Tensor &grad) {
-    AT_ASSERTM(x.is_contiguous(), "input must be contiguous");
+    CHECK_INPUT(x);
+    CHECK_INPUT(bias);
     AT_ASSERTM(bias.dim() == 1, "expected 1D tensor");
     AT_ASSERTM(bias.size(-1) == x.size(-1), "the dimension of bias and the last dimension of the input should be the same");
     AT_ASSERTM(x.scalar_type() == bias.scalar_type() && x.scalar_type() == grad.scalar_type(), "the types mismatch");
@@ -33,7 +42,8 @@ torch::Tensor bias_gelu_torch_backward(const torch::Tensor &x, const torch::Tens
 }
 
 torch::Tensor bias_gelu_fast_backward(const torch::Tensor &x, const torch::Tensor &bias, const torch::Tensor &grad) {
-    AT_ASSERTM(x.is_contiguous(), "input must be contiguous");
+    CHECK_INPUT(x);
+    CHECK_INPUT(bias);
     AT_ASSERTM(bias.dim() == 1, "expected 1D tensor");
     AT_ASSERTM(bias.size(-1) == x.size(-1), "the dimension of bias and the last dimension of the input should be the same");
     AT_ASSERTM(x.scalar_type() == bias.scalar_type() && x.scalar_type() == grad.scalar_type(), "the types mismatch");

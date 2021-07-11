@@ -1,7 +1,7 @@
 try:
     import torch
     import fused_bias_dropout_add_cuda
-    from .fused_bias_dropout_add import BiasDropoutAddFunction
+    from .fused_bias_dropout_add import BiasDropoutAddFunction, bias_dropout_add
     del torch
     del fused_bias_dropout_add_cuda
     del fused_bias_dropout_add

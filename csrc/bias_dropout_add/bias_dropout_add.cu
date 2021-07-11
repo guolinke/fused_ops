@@ -8,19 +8,11 @@
 #include <cuda_runtime.h>
 #include <cuda_fp16.h>
 #include <cuda_bf16.h>
-#include <cuda_profiler_api.h>
 #include <curand_kernel.h>
-#include "THC/THC.h"
 #include <ATen/cuda/CUDAContext.h>
 #include <torch/extension.h>
 #include <math.h>
-
-#define CELL(a, b) (((a) + (b) - 1) / (b))
-#if __cplusplus >= 201703L
-    #define IF_CONSTEXPR constexpr
-#else
-    #define IF_CONSTEXPR
-#endif
+#include "util.h"
 
 template <typename MaskType, typename acc_t, typename IndexType>
 __global__ void generate_dropout_mask_kernel(MaskType* output, IndexType n, uint64_t seed, uint64_t offset, acc_t p) {
@@ -43,10 +35,10 @@ __global__ void generate_dropout_mask_kernel(MaskType* output, IndexType n, uint
 
 template <typename MaskType>
 void generate_dropout_mask(MaskType* mask, int bsz, int dim, float p, uint64_t seed, uint64_t offset) {
-    const int mask_elements_per_batch = CELL(dim, sizeof(MaskType) * 8);
+    const int mask_elements_per_batch = DIV_CELL(dim, sizeof(MaskType) * 8);
     const int num_elements = bsz * mask_elements_per_batch;
     const int block_size = 128;
-    const int grid = CELL(num_elements, block_size);
+    const int grid = DIV_CELL(num_elements, block_size);
     generate_dropout_mask_kernel<MaskType, float, size_t><<<grid, block_size>>>(mask, num_elements, seed, offset, p);
 }
 
@@ -65,7 +57,7 @@ __global__ void bias_dropout_add_forward(output_t *dst, const input_t *x, const 
     const input_t *residual, const uint8_t *mask, index_t bsz, int dim, input_t pinv) {
     if (blockIdx.x < bsz) {
         if IF_CONSTEXPR (is_training) {
-            const int mask_index = blockIdx.x * CELL(dim, 8);
+            const int mask_index = blockIdx.x * DIV_CELL(dim, 8);
             const uint8_t mask_offset = threadIdx.x % 8;
             for (int j = threadIdx.x; j < dim; j += blockDim.x) {
                 const index_t idx = blockIdx.x * dim + j;
@@ -82,36 +74,14 @@ __global__ void bias_dropout_add_forward(output_t *dst, const input_t *x, const 
     }
 }
 
-template <typename T>
-struct VecTypeImpl;
-
-template <>
-struct VecTypeImpl<half> {
-    using type = half2;
-};
-
-
-template <>
-struct VecTypeImpl<nv_bfloat16> {
-    using type = nv_bfloat162;
-};
-
-template <>
-struct VecTypeImpl<float> {
-    using type = float2;
-};
-
-template <typename T>
-using VecType = typename VecTypeImpl<T>::type;
-
 template <typename index_t, typename input_t, typename output_t, bool is_training>
 __global__ void bias_dropout_add_forward_vec(output_t *dst, const input_t *x, const input_t *bias,
     const input_t *residual, const uint8_t *mask, index_t bsz, int dim, input_t pinv) {
-    using VecInType = VecType<input_t>;
-    using VecOutType = VecType<output_t>;
+    using VecInType = VecType<input_t, 2>;
+    using VecOutType = VecType<output_t, 2>;
     if (blockIdx.x < bsz) {
         if IF_CONSTEXPR (is_training) {
-            const int mask_index = blockIdx.x * CELL(dim, 8);
+            const int mask_index = blockIdx.x * DIV_CELL(dim, 8);
             const uint8_t mask_offset1 = (threadIdx.x * 2) % 8;
             const uint8_t mask_offset2 = (threadIdx.x * 2 + 1) % 8;
             for (int j = threadIdx.x * 2; j < dim; j += blockDim.x * 2) {
@@ -145,7 +115,7 @@ __global__ void bias_dropout_add_forward_vec(output_t *dst, const input_t *x, co
 template <typename index_t, typename input_t, typename output_t>
 __global__ void bias_dropout_add_backward(output_t *dst, const input_t *grad, const uint8_t *mask, index_t bsz, int dim, input_t pinv) {
     if (blockIdx.x < bsz) {
-        const int mask_index = blockIdx.x * CELL(dim, 8);
+        const int mask_index = blockIdx.x * DIV_CELL(dim, 8);
         const uint8_t mask_offset = threadIdx.x % 8;
         for (int j = threadIdx.x; j < dim; j += blockDim.x) {
             const index_t idx = blockIdx.x * dim + j;
@@ -157,10 +127,10 @@ __global__ void bias_dropout_add_backward(output_t *dst, const input_t *grad, co
 
 template <typename index_t, typename input_t, typename output_t>
 __global__ void bias_dropout_add_backward_vec(output_t *dst, const input_t *grad, const uint8_t *mask, index_t bsz, int dim, input_t pinv) {
-    using VecInType = VecType<input_t>;
-    using VecOutType = VecType<output_t>;
+    using VecInType = VecType<input_t, 2>;
+    using VecOutType = VecType<output_t, 2>;
     if (blockIdx.x < bsz) {
-        const int mask_index = blockIdx.x * CELL(dim, 8);
+        const int mask_index = blockIdx.x * DIV_CELL(dim, 8);
         const uint8_t mask_offset1 = (threadIdx.x * 2) % 8;
         const uint8_t mask_offset2 = (threadIdx.x * 2 + 1) % 8;
         for (int j = threadIdx.x * 2; j < dim; j += blockDim.x * 2) {
@@ -189,10 +159,10 @@ std::vector<c10::optional<torch::Tensor>> bias_dropout_add_forward_cuda(const to
     torch::Tensor results = torch::empty(sizes, dst_options);
     auto type = x.scalar_type();
     const int ThreadsPerBlock = 256;
-    int ThreadsPerBlockVec = CELL(dim, 256) * 256 % 512 == 0 ? 256 : 128;
+    int ThreadsPerBlockVec = DIV_CELL(dim, 256) * 256 % 512 == 0 ? 256 : 128;
     if (is_training && dropout_prob != 0.0) {
         auto mask_options = dst_options.dtype(torch::kInt64);
-        torch::Tensor mask = torch::empty(bsz * CELL(dim, sizeof(MaskType) * 8), mask_options);
+        torch::Tensor mask = torch::empty(bsz * DIV_CELL(dim, sizeof(MaskType) * 8), mask_options);
         auto gen = at::get_generator_or_default<at::CUDAGeneratorImpl>(gen_, at::cuda::detail::getDefaultCUDAGenerator());
         std::pair<uint64_t, uint64_t> rng_engine_inputs;
         {
@@ -331,7 +301,7 @@ torch::Tensor bias_dropout_add_backward_cuda(const torch::Tensor &grad, const to
     torch::Tensor results = torch::empty(sizes, dst_options);
     auto type = grad.scalar_type();
     const int ThreadsPerBlock = 256;
-    int ThreadsPerBlockVec = CELL(dim, 256) * 256 % 512 == 0 ? 256 : 128;
+    int ThreadsPerBlockVec = DIV_CELL(dim, 256) * 256 % 512 == 0 ? 256 : 128;
     if (type == at::ScalarType::BFloat16) {
         if (dim % 2 == 0) {
             bias_dropout_add_backward_vec<size_t, nv_bfloat16, nv_bfloat16><<<bsz, ThreadsPerBlockVec, 0, stream>>>(
