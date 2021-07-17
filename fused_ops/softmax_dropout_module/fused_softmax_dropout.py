@@ -19,7 +19,7 @@ class SoftmaxDropoutFast(torch.autograd.Function):
         dropout_prob = ctx.dropout_prob
         grad_input = fused_softmax_dropout_fast_cuda.backward(grad_output, softmax_results,
             dropout_mask, dropout_prob)
-        return None, None, grad_input, None
+        return None, grad_input, None
 
 def softmax_dropout(input, dropout_prob, is_training=True):
     return SoftmaxDropoutFast.apply(is_training, input, dropout_prob)
