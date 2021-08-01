@@ -184,7 +184,9 @@ void cuda_layer_norm(
     
     if (type == at::ScalarType::BFloat16) {
         switch (n2) {
+        case 128: LAUNCH_FORWARD_KERNEL(128, 2, 4, nv_bfloat16)
         case 256: LAUNCH_FORWARD_KERNEL(256, 2, 4, nv_bfloat16)
+        case 384: LAUNCH_FORWARD_KERNEL(384, 2, 4, nv_bfloat16)
         case 512: LAUNCH_FORWARD_KERNEL(512, 2, 4, nv_bfloat16)
         case 768: LAUNCH_FORWARD_KERNEL(768, 2, 4, nv_bfloat16)
         case 1024: LAUNCH_FORWARD_KERNEL(1024, 2, 4, nv_bfloat16)
@@ -195,7 +197,9 @@ void cuda_layer_norm(
         }
     } else if (type == at::ScalarType::Half) {
         switch (n2) {
+        case 128: LAUNCH_FORWARD_KERNEL(128, 2, 4, half)
         case 256: LAUNCH_FORWARD_KERNEL(256, 2, 4, half)
+        case 384: LAUNCH_FORWARD_KERNEL(384, 2, 4, half)
         case 512: LAUNCH_FORWARD_KERNEL(512, 2, 4, half)
         case 768: LAUNCH_FORWARD_KERNEL(768, 2, 4, half)
         case 1024: LAUNCH_FORWARD_KERNEL(1024, 2, 4, half)
@@ -206,7 +210,9 @@ void cuda_layer_norm(
         }
     } else if (type == at::ScalarType::Float) {
         switch (n2) {
+        case 128: LAUNCH_FORWARD_KERNEL(128, 1, 4, float)
         case 256: LAUNCH_FORWARD_KERNEL(256, 1, 4, float)
+        case 384: LAUNCH_FORWARD_KERNEL(384, 1, 4, float)
         case 512: LAUNCH_FORWARD_KERNEL(512, 1, 4, float)
         case 768: LAUNCH_FORWARD_KERNEL(768, 1, 4, float)
         case 1024: LAUNCH_FORWARD_KERNEL(1024, 1, 4, float)
@@ -236,7 +242,9 @@ void cuda_layer_norm_gradient(
     
     if (type == at::ScalarType::BFloat16) {
         switch (n2) {
+        case 128: LAUNCH_BACKWARD_KERNEL(128, 2, 4, nv_bfloat16)
         case 256: LAUNCH_BACKWARD_KERNEL(256, 2, 4, nv_bfloat16)
+        case 384: LAUNCH_BACKWARD_KERNEL(384, 2, 4, nv_bfloat16)
         case 512: LAUNCH_BACKWARD_KERNEL(512, 2, 4, nv_bfloat16)
         case 768: LAUNCH_BACKWARD_KERNEL(768, 2, 4, nv_bfloat16)
         case 1024: LAUNCH_BACKWARD_KERNEL(1024, 2, 4, nv_bfloat16)
@@ -247,7 +255,9 @@ void cuda_layer_norm_gradient(
         }
     } else if (type == at::ScalarType::Half) {
         switch (n2) {
+        case 128: LAUNCH_BACKWARD_KERNEL(128, 2, 4, half)
         case 256: LAUNCH_BACKWARD_KERNEL(256, 2, 4, half)
+        case 384: LAUNCH_BACKWARD_KERNEL(384, 2, 4, half)
         case 512: LAUNCH_BACKWARD_KERNEL(512, 2, 4, half)
         case 768: LAUNCH_BACKWARD_KERNEL(768, 2, 4, half)
         case 1024: LAUNCH_BACKWARD_KERNEL(1024, 2, 4, half)
@@ -258,7 +268,9 @@ void cuda_layer_norm_gradient(
         }
     } else if (type == at::ScalarType::Float) {
         switch (n2) {
+        case 128: LAUNCH_BACKWARD_KERNEL(128, 1, 4, float)
         case 256: LAUNCH_BACKWARD_KERNEL(256, 1, 4, float)
+        case 384: LAUNCH_BACKWARD_KERNEL(384, 1, 4, float)
         case 512: LAUNCH_BACKWARD_KERNEL(512, 1, 4, float)
         case 768: LAUNCH_BACKWARD_KERNEL(768, 1, 4, float)
         case 1024: LAUNCH_BACKWARD_KERNEL(1024, 1, 4, float)
