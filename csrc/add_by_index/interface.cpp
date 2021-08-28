@@ -3,7 +3,7 @@
 #include <ATen/CUDAGeneratorImpl.h>
 #include <vector>
 
-extern torch::Tensor (*add_by_index_cuda)(const torch::Tensor &input, const torch::Tensor &indices, int64_t num_embeddings, torch::Tensor &output);
+torch::Tensor add_by_index_cuda(const torch::Tensor &input, const torch::Tensor &indices, int64_t num_embeddings, torch::Tensor &output);
 
 // C++ interface
 
@@ -19,5 +19,5 @@ torch::Tensor add_by_index(const torch::Tensor &input, const torch::Tensor &indi
 }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-    m.def("forward", &add_by_index, "add_by_index");
+    m.def("forward", &add_by_index, "add_by_index forward");
 }
