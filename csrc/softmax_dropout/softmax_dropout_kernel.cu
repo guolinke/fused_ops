@@ -24,7 +24,7 @@ std::vector<c10::optional<torch::Tensor>> fwd_cuda(
 ) {
     const int attn_batches   = input.size(0);
     const int q_seq_len      = input.size(1);
-    const int k_seq_len      = q_seq_len;
+    const int k_seq_len      = input.size(2);
 
     auto act_options  = input.options().requires_grad(false);
     auto mask_options = act_options.dtype(softmax_mask_dtype(k_seq_len));
@@ -136,7 +136,7 @@ torch::Tensor bwd_cuda(
 {
     const int attn_batches   = output_grads.size(0);
     const int q_seq_len      = output_grads.size(1);
-    const int k_seq_len      = q_seq_len;
+    const int k_seq_len      = output_grads.size(2);
 
     auto scalar_type = output_grads.scalar_type();
 
