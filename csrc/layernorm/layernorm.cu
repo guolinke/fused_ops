@@ -184,6 +184,7 @@ void cuda_layer_norm(
     
     if (type == at::ScalarType::BFloat16) {
         switch (n2) {
+        case 64: LAUNCH_FORWARD_KERNEL(64, 2, 4, nv_bfloat16)
         case 128: LAUNCH_FORWARD_KERNEL(128, 2, 4, nv_bfloat16)
         case 256: LAUNCH_FORWARD_KERNEL(256, 2, 4, nv_bfloat16)
         case 384: LAUNCH_FORWARD_KERNEL(384, 2, 4, nv_bfloat16)
@@ -197,6 +198,7 @@ void cuda_layer_norm(
         }
     } else if (type == at::ScalarType::Half) {
         switch (n2) {
+        case 64: LAUNCH_FORWARD_KERNEL(64, 2, 4, half)
         case 128: LAUNCH_FORWARD_KERNEL(128, 2, 4, half)
         case 256: LAUNCH_FORWARD_KERNEL(256, 2, 4, half)
         case 384: LAUNCH_FORWARD_KERNEL(384, 2, 4, half)
@@ -210,6 +212,7 @@ void cuda_layer_norm(
         }
     } else if (type == at::ScalarType::Float) {
         switch (n2) {
+        case 64: LAUNCH_FORWARD_KERNEL(64, 1, 4, float)
         case 128: LAUNCH_FORWARD_KERNEL(128, 1, 4, float)
         case 256: LAUNCH_FORWARD_KERNEL(256, 1, 4, float)
         case 384: LAUNCH_FORWARD_KERNEL(384, 1, 4, float)
@@ -242,6 +245,7 @@ void cuda_layer_norm_gradient(
     
     if (type == at::ScalarType::BFloat16) {
         switch (n2) {
+        case 64: LAUNCH_BACKWARD_KERNEL(64, 2, 4, nv_bfloat16)
         case 128: LAUNCH_BACKWARD_KERNEL(128, 2, 4, nv_bfloat16)
         case 256: LAUNCH_BACKWARD_KERNEL(256, 2, 4, nv_bfloat16)
         case 384: LAUNCH_BACKWARD_KERNEL(384, 2, 4, nv_bfloat16)
@@ -255,6 +259,7 @@ void cuda_layer_norm_gradient(
         }
     } else if (type == at::ScalarType::Half) {
         switch (n2) {
+        case 64: LAUNCH_BACKWARD_KERNEL(64, 2, 4, half)
         case 128: LAUNCH_BACKWARD_KERNEL(128, 2, 4, half)
         case 256: LAUNCH_BACKWARD_KERNEL(256, 2, 4, half)
         case 384: LAUNCH_BACKWARD_KERNEL(384, 2, 4, half)
@@ -268,6 +273,7 @@ void cuda_layer_norm_gradient(
         }
     } else if (type == at::ScalarType::Float) {
         switch (n2) {
+        case 64: LAUNCH_BACKWARD_KERNEL(64, 1, 4, float)
         case 128: LAUNCH_BACKWARD_KERNEL(128, 1, 4, float)
         case 256: LAUNCH_BACKWARD_KERNEL(256, 1, 4, float)
         case 384: LAUNCH_BACKWARD_KERNEL(384, 1, 4, float)
