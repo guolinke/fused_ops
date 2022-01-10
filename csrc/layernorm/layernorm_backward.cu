@@ -5,7 +5,6 @@
 
 #include <cuda.h>
 #include <cuda_runtime.h>
-#include <cuda_bf16.h>
 
 #include "type_shim.h"
 
