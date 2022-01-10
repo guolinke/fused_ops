@@ -26,13 +26,10 @@ struct VecTypeImpl<t, n> { \
 };
 
 DEFINE_VEC_TYPE(half, 1, half)
-DEFINE_VEC_TYPE(__nv_bfloat16, 1, __nv_bfloat16)
 DEFINE_VEC_TYPE(float, 1, float)
 DEFINE_VEC_TYPE(half, 2, half2)
-DEFINE_VEC_TYPE(__nv_bfloat16, 2, __nv_bfloat162)
 DEFINE_VEC_TYPE(float, 2, float2)
 DEFINE_VEC_TYPE(half, 4, uint64_t)
-DEFINE_VEC_TYPE(__nv_bfloat16, 4, uint64_t)
 DEFINE_VEC_TYPE(float, 4, float4)
 
 template <typename T, int N>
