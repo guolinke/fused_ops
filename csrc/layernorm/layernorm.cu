@@ -182,21 +182,7 @@ void cuda_layer_norm(
     cudaStream_t stream = at::cuda::getCurrentCUDAStream().stream();
     auto type = input->scalar_type();
     
-    if (type == at::ScalarType::BFloat16) {
-        switch (n2) {
-        case 64: LAUNCH_FORWARD_KERNEL(64, 2, 4, nv_bfloat16)
-        case 128: LAUNCH_FORWARD_KERNEL(128, 2, 4, nv_bfloat16)
-        case 256: LAUNCH_FORWARD_KERNEL(256, 2, 4, nv_bfloat16)
-        case 384: LAUNCH_FORWARD_KERNEL(384, 2, 4, nv_bfloat16)
-        case 512: LAUNCH_FORWARD_KERNEL(512, 2, 4, nv_bfloat16)
-        case 768: LAUNCH_FORWARD_KERNEL(768, 2, 4, nv_bfloat16)
-        case 1024: LAUNCH_FORWARD_KERNEL(1024, 2, 4, nv_bfloat16)
-        case 1280: LAUNCH_FORWARD_KERNEL(1280, 2, 4, nv_bfloat16)
-        case 1536: LAUNCH_FORWARD_KERNEL(1536, 2, 4, nv_bfloat16)
-        case 1792: LAUNCH_FORWARD_KERNEL(1792, 2, 4, nv_bfloat16)
-        case 2048: LAUNCH_FORWARD_KERNEL(2048, 2, 4, nv_bfloat16)
-        }
-    } else if (type == at::ScalarType::Half) {
+    if (type == at::ScalarType::Half) {
         switch (n2) {
         case 64: LAUNCH_FORWARD_KERNEL(64, 2, 4, half)
         case 128: LAUNCH_FORWARD_KERNEL(128, 2, 4, half)
@@ -243,21 +229,7 @@ void cuda_layer_norm_gradient(
     cudaStream_t stream = at::cuda::getCurrentCUDAStream().stream();
     auto type = input->scalar_type();
     
-    if (type == at::ScalarType::BFloat16) {
-        switch (n2) {
-        case 64: LAUNCH_BACKWARD_KERNEL(64, 2, 4, nv_bfloat16)
-        case 128: LAUNCH_BACKWARD_KERNEL(128, 2, 4, nv_bfloat16)
-        case 256: LAUNCH_BACKWARD_KERNEL(256, 2, 4, nv_bfloat16)
-        case 384: LAUNCH_BACKWARD_KERNEL(384, 2, 4, nv_bfloat16)
-        case 512: LAUNCH_BACKWARD_KERNEL(512, 2, 4, nv_bfloat16)
-        case 768: LAUNCH_BACKWARD_KERNEL(768, 2, 4, nv_bfloat16)
-        case 1024: LAUNCH_BACKWARD_KERNEL(1024, 2, 4, nv_bfloat16)
-        case 1280: LAUNCH_BACKWARD_KERNEL(1280, 2, 4, nv_bfloat16)
-        case 1536: LAUNCH_BACKWARD_KERNEL(1536, 2, 4, nv_bfloat16)
-        case 1792: LAUNCH_BACKWARD_KERNEL(1792, 2, 4, nv_bfloat16)
-        case 2048: LAUNCH_BACKWARD_KERNEL(2048, 2, 4, nv_bfloat16)
-        }
-    } else if (type == at::ScalarType::Half) {
+    if (type == at::ScalarType::Half) {
         switch (n2) {
         case 64: LAUNCH_BACKWARD_KERNEL(64, 2, 4, half)
         case 128: LAUNCH_BACKWARD_KERNEL(128, 2, 4, half)

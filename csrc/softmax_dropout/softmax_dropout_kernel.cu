@@ -8,7 +8,6 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <cuda_fp16.h>
-#include <cuda_bf16.h>
 #include <cuda_profiler_api.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <torch/extension.h>
@@ -53,16 +52,7 @@ std::vector<c10::optional<torch::Tensor>> fwd_cuda(
         }
         uint64_t seed = std::get<0>(rng_engine_inputs);
         uint64_t offset = std::get<1>(rng_engine_inputs);
-        if (scalar_type == at::ScalarType::BFloat16){
-            softmax_success = dispatch_softmax_forward<nv_bfloat16, nv_bfloat16, float, true>(
-                reinterpret_cast<nv_bfloat16 *>(dropout_results.data_ptr()),
-                reinterpret_cast<nv_bfloat16 *>(softmax_results_ptr),
-                reinterpret_cast<const nv_bfloat16 *>(input_ptr),
-                reinterpret_cast<void *>(dropout_mask.data_ptr()),
-                1.0f - dropout_prob,
-                k_seq_len,
-                attn_batches*q_seq_len, seed, offset);
-        } else if (scalar_type == at::ScalarType::Half){
+        if (scalar_type == at::ScalarType::Half){
             softmax_success = dispatch_softmax_forward<half, half, float, true>(
                 reinterpret_cast<half *>(dropout_results.data_ptr()),
                 reinterpret_cast<half *>(softmax_results_ptr),
@@ -89,16 +79,7 @@ std::vector<c10::optional<torch::Tensor>> fwd_cuda(
             return {c10::optional<torch::Tensor>(), c10::optional<torch::Tensor>(), c10::optional<torch::Tensor>()};
         }
     } else {
-        if (scalar_type == at::ScalarType::BFloat16){
-            softmax_success = dispatch_softmax_forward<nv_bfloat16, nv_bfloat16, float, false>(
-                reinterpret_cast<nv_bfloat16 *>(softmax_results_ptr),
-                nullptr,
-                reinterpret_cast<const nv_bfloat16 *>(input_ptr),
-                nullptr,
-                1.0,
-                k_seq_len,
-                attn_batches*q_seq_len, 0, 0);
-        } else if (scalar_type == at::ScalarType::Half){
+        if (scalar_type == at::ScalarType::Half){
             softmax_success = dispatch_softmax_forward<half, half, float, false>(
                 reinterpret_cast<half *>(softmax_results_ptr),
                 nullptr,
@@ -143,16 +124,7 @@ torch::Tensor bwd_cuda(
     // Apply Dropout Mask and Scale by Dropout Probability 
     // Softmax Grad
     if (dropout_mask) {
-        if (scalar_type == at::ScalarType::BFloat16){
-            dispatch_softmax_backward<nv_bfloat16, nv_bfloat16, float, false, true>(
-                reinterpret_cast<nv_bfloat16 *>(output_grads.data_ptr()), 
-                reinterpret_cast<const nv_bfloat16 *>(output_grads.data_ptr()), 
-                reinterpret_cast<const nv_bfloat16 *>(softmax_results.data_ptr()),
-                reinterpret_cast<const void *>(dropout_mask->data_ptr()),
-                1.0f - dropout_prob,
-                k_seq_len,
-                attn_batches*q_seq_len);
-        } else if (scalar_type == at::ScalarType::Half){
+        if (scalar_type == at::ScalarType::Half){
             dispatch_softmax_backward<half, half, float, false, true>(
                 reinterpret_cast<half *>(output_grads.data_ptr()), 
                 reinterpret_cast<const half *>(output_grads.data_ptr()), 
@@ -172,16 +144,7 @@ torch::Tensor bwd_cuda(
                 attn_batches*q_seq_len);
         }
     } else {
-        if (scalar_type == at::ScalarType::BFloat16){
-            dispatch_softmax_backward<nv_bfloat16, nv_bfloat16, float, false, false>(
-                reinterpret_cast<nv_bfloat16 *>(output_grads.data_ptr()), 
-                reinterpret_cast<nv_bfloat16 *>(output_grads.data_ptr()), 
-                reinterpret_cast<const nv_bfloat16 *>(softmax_results.data_ptr()),
-                nullptr,
-                1.0f,
-                k_seq_len,
-                attn_batches*q_seq_len);
-        } else if (scalar_type == at::ScalarType::Half){
+        if (scalar_type == at::ScalarType::Half){
             dispatch_softmax_backward<half, half, float, false, false>(
                 reinterpret_cast<half *>(output_grads.data_ptr()), 
                 reinterpret_cast<half *>(output_grads.data_ptr()), 
