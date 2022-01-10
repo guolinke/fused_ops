@@ -4,7 +4,6 @@
 #include "ATen/cuda/CUDAContext.h"
 #include <cuda.h>
 #include <cuda_runtime.h>
-#include <cuda_bf16.h>
 #include "util.h"
 
 template <int Dim_, int VecSize_, int BatchesPerBlock_, int WarpsForOneBatchPerBlock_>
