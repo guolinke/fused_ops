@@ -65,7 +65,6 @@ template <
 __global__ void softmax_warp_forward(input_t *dst, input_t *dst_orig, const output_t *src,
     typename Parameters::MaskType *mask, acc_t p, int batch_size, int element_count, uint64_t seed, uint64_t offset) {
     using MaskType = typename Parameters::MaskType;
-    curandStatePhilox4_32_10_t state;
     int first_batch = (blockDim.y * blockIdx.x + threadIdx.y) * Parameters::WarpBatch;
     // there might be multiple batches per warp. compute the index within the batch
     int local_idx = threadIdx.x;
