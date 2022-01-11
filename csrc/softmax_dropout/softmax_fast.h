@@ -177,8 +177,7 @@ __global__ void softmax_warp_forward(input_t *dst, input_t *dst_orig, const outp
     }
 }
 
-#define LAUNCH_FORWARD_KERNEL(l) \
-softmax_warp_forward<input_t, output_t, acc_t, SoftmaxParameters<l>, NeedMask> \
+#define LAUNCH_FORWARD_KERNEL(l) softmax_warp_forward<input_t, output_t, acc_t, SoftmaxParameters<l>, NeedMask> \
     <<<blocks, threads, 0, at::cuda::getCurrentCUDAStream()>>>( \
     dst, dst_orig, src, (typename SoftmaxParameters<l>::MaskType *)mask, p, \
     batch_count, softmax_elements, seed, offset \
@@ -322,8 +321,7 @@ __global__ void softmax_warp_backward(output_t *gradInput, const input_t *grad, 
     }
 }
 
-#define LAUNCH_BACKWARD_KERNEL(l) \
-softmax_warp_backward<input_t, output_t, acc_t, SoftmaxParameters<l>, IsLogSoftmax, NeedMask> \
+#define LAUNCH_BACKWARD_KERNEL(l) softmax_warp_backward<input_t, output_t, acc_t, SoftmaxParameters<l>, IsLogSoftmax, NeedMask> \
     <<<blocks, threads, 0, at::cuda::getCurrentCUDAStream()>>>( \
     grad_input, grad, output, (const typename SoftmaxParameters<l>::MaskType *)mask, p, \
     batch_count, softmax_elements \
