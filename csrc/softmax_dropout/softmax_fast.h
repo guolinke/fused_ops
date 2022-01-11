@@ -4,7 +4,6 @@
 #include <limits>
 #include <cuda.h>
 #include <cuda_fp16.h>
-#include <curand_kernel.h>
 #include "util.h"
 
 template <int N>
@@ -71,9 +70,9 @@ __global__ void softmax_warp_forward(input_t *dst, input_t *dst_orig, const outp
     // there might be multiple batches per warp. compute the index within the batch
     int local_idx = threadIdx.x;
     const int thread_offset = first_batch * element_count + local_idx;
-    if IF_CONSTEXPR (NeedMask) {
-        curand_init(seed, thread_offset, offset, &state);
-    }
+    // if IF_CONSTEXPR (NeedMask) {
+    //     curand_init(seed, thread_offset, offset, &state);
+    // }
  
     // batch_size might not be a multiple of Parameters::WarpBatch. Check how
     // many batches have to computed within this WARP.
@@ -83,10 +82,10 @@ __global__ void softmax_warp_forward(input_t *dst, input_t *dst_orig, const outp
  
     src += thread_offset;
     dst += thread_offset;
-    if IF_CONSTEXPR (NeedMask) {
-        dst_orig += thread_offset;
-        mask += first_batch * Parameters::MaskStride;
-    }
+    // if IF_CONSTEXPR (NeedMask) {
+    //     dst_orig += thread_offset;
+    //     mask += first_batch * Parameters::MaskStride;
+    // }
  
     // load data from global memory
     input_t elements_input[Parameters::WarpBatch][Parameters::WarpIterations];
@@ -162,57 +161,18 @@ __global__ void softmax_warp_forward(input_t *dst, input_t *dst_orig, const outp
     }
 
     // store result
-    if IF_CONSTEXPR (NeedMask) {
-        const acc_t pinv = 1.0 / p;
+    #pragma unroll
+    for (int i = 0; i < Parameters::WarpBatch; ++i) {
+        if (i >= local_batches)
+            break;
         #pragma unroll
-        for (int i = 0; i < Parameters::WarpBatch; ++i) {
-            if (i >= local_batches)
-                break;
-            MaskType m = 0;
-            if IF_CONSTEXPR (Parameters::WarpIterations == 1) {
-                float rand = curand_uniform(&state);
-                m = rand < p;
-            } else if IF_CONSTEXPR (Parameters::WarpIterations == 2) {
-                m = curand_uniform(&state) < p;
-                m |= (curand_uniform(&state) < p) << 1;
-            } else {
-                #pragma unroll
-                for (int j = 0; j < DIV_CELL(Parameters::WarpIterations, 4); ++j) {
-                    float4 rand4 = curand_uniform4(&state);
-                    m |= (((MaskType)(rand4.x < p)) << (j * 4))
-                     | (((MaskType)(rand4.y < p)) << (j * 4 + 1))
-                     | (((MaskType)(rand4.z < p)) << (j * 4 + 2))
-                     | (((MaskType)(rand4.w < p)) << (j * 4 + 3));
-                }
+        for (int it = 0; it < Parameters::WarpIterations; ++it) {
+            int element_index = local_idx + it * Parameters::WarpSize;
+            if (element_index < element_count) {
+                dst[i * element_count + it * Parameters::WarpSize] = elements[i][it] / sum[i];
             }
-            mask[i * Parameters::MaskStride + local_idx] = m;
-            #pragma unroll
-            for (int it = 0; it < Parameters::WarpIterations; ++it) {
-                int element_index = local_idx + it * Parameters::WarpSize;
-                if (element_index < element_count) {
-                    const output_t d = elements[i][it] / sum[i];
-                    dst[i * element_count + it * Parameters::WarpSize] = (acc_t)d * ((acc_t)((m >> it) & 1) * pinv);
-                    dst_orig[i * element_count + it * Parameters::WarpSize] = d;
-                }
-                else {
-                    break;
-                }
-            }
-        }
-    } else {
-        #pragma unroll
-        for (int i = 0; i < Parameters::WarpBatch; ++i) {
-            if (i >= local_batches)
+            else {
                 break;
-            #pragma unroll
-            for (int it = 0; it < Parameters::WarpIterations; ++it) {
-                int element_index = local_idx + it * Parameters::WarpSize;
-                if (element_index < element_count) {
-                    dst[i * element_count + it * Parameters::WarpSize] = elements[i][it] / sum[i];
-                }
-                else {
-                    break;
-                }
             }
         }
     }
@@ -294,9 +254,9 @@ __global__ void softmax_warp_backward(output_t *gradInput, const input_t *grad, 
     grad += thread_offset;
     output += thread_offset;
     gradInput += thread_offset;
-    if IF_CONSTEXPR (NeedMask) {
-        mask += first_batch * Parameters::MaskStride;
-    }
+    // if IF_CONSTEXPR (NeedMask) {
+    //     mask += first_batch * Parameters::MaskStride;
+    // }
 
     // The nested loops over Parameters::WarpBatch and then Parameters::WarpIterations can be simplified to one loop,
     // but I think doing so would obfuscate the logic of the algorithm, thus I chose to keep
@@ -306,54 +266,19 @@ __global__ void softmax_warp_backward(output_t *gradInput, const input_t *grad, 
     // load data from global memory
     acc_t grad_reg[Parameters::WarpBatch][Parameters::WarpIterations];
     acc_t output_reg[Parameters::WarpBatch][Parameters::WarpIterations] ;
-    if IF_CONSTEXPR (NeedMask) {
-        MaskType mask_reg[Parameters::WarpBatch];
+    #pragma unroll
+    for (int i = 0; i < Parameters::WarpBatch; ++i) {
+        int batch_element_count = (i >= local_batches) ? 0 : element_count;
         #pragma unroll
-        for (int i = 0; i < Parameters::WarpBatch; ++i) {
-            if (i >= local_batches)
-                break;
-            mask_reg[i] = mask[i * Parameters::MaskStride + local_idx];
-        }
-        
-        const acc_t pinv = 1.0 / p;
-        
-        #pragma unroll
-        for (int i = 0; i < Parameters::WarpBatch; ++i) {
-            int batch_element_count = (i >= local_batches) ? 0 : element_count;
-            MaskType m = mask_reg[i];
-            #pragma unroll
-            for (int it = 0; it < Parameters::WarpIterations; ++it) {
-                int element_index = local_idx + it * Parameters::WarpSize;
-                if (element_index < batch_element_count) {
-                    grad_reg[i][it] =
-                        (input_t)(
-                            (acc_t)((m >> it) & 1) *
-                            (acc_t)grad[i * element_count + it * Parameters::WarpSize] *
-                            pinv
-                        ) *
-                        output[i * element_count + it * Parameters::WarpSize];
-                    output_reg[i][it] = output[i * element_count + it * Parameters::WarpSize];
-                } else {
-                    grad_reg[i][it] = acc_t(0);
-                    output_reg[i][it] = acc_t(0);
-                }
-            }
-        }
-    } else {
-        #pragma unroll
-        for (int i = 0; i < Parameters::WarpBatch; ++i) {
-            int batch_element_count = (i >= local_batches) ? 0 : element_count;
-            #pragma unroll
-            for (int it = 0; it < Parameters::WarpIterations; ++it) {
-                int element_index = local_idx + it * Parameters::WarpSize;
-                if (element_index < batch_element_count) {
-                    grad_reg[i][it] = grad[i * element_count + it * Parameters::WarpSize] *
-                        output[i * element_count + it * Parameters::WarpSize];
-                    output_reg[i][it] = output[i * element_count + it * Parameters::WarpSize];
-                } else {
-                    grad_reg[i][it] = acc_t(0);
-                    output_reg[i][it] = acc_t(0);
-                }
+        for (int it = 0; it < Parameters::WarpIterations; ++it) {
+            int element_index = local_idx + it * Parameters::WarpSize;
+            if (element_index < batch_element_count) {
+                grad_reg[i][it] = grad[i * element_count + it * Parameters::WarpSize] *
+                    output[i * element_count + it * Parameters::WarpSize];
+                output_reg[i][it] = output[i * element_count + it * Parameters::WarpSize];
+            } else {
+                grad_reg[i][it] = acc_t(0);
+                output_reg[i][it] = acc_t(0);
             }
         }
     }
