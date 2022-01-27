@@ -68,10 +68,10 @@ __global__ void softmax_warp_forward(input_t *dst, input_t *dst_orig, const outp
     typename Parameters::MaskType *mask, acc_t p, int batch_size, int element_count, uint64_t seed, uint64_t offset) {
     using MaskType = typename Parameters::MaskType;
     curandStatePhilox4_32_10_t state;
-    int first_batch = (blockDim.y * blockIdx.x + threadIdx.y) * Parameters::WarpBatch;
+    int64_t first_batch = (static_cast<int64_t>(blockDim.y) * static_cast<int64_t>(blockIdx.x) + threadIdx.y) * Parameters::WarpBatch;
     // there might be multiple batches per warp. compute the index within the batch
-    int local_idx = threadIdx.x;
-    const int thread_offset = first_batch * element_count + local_idx;
+    int64_t local_idx = threadIdx.x;
+    const int64_t thread_offset = first_batch * element_count + local_idx;
     if IF_CONSTEXPR (NeedMask) {
         curand_init(seed, thread_offset, offset, &state);
     }
@@ -279,7 +279,7 @@ __global__ void softmax_warp_backward(output_t *gradInput, const input_t *grad, 
     const typename Parameters::MaskType *mask, acc_t p, int batch_size, int element_count)
 {
     using MaskType = typename Parameters::MaskType;
-    int first_batch = (blockDim.y * blockIdx.x + threadIdx.y) * Parameters::WarpBatch;
+    int64_t first_batch = (static_cast<int64_t>(blockDim.y) * static_cast<int64_t>(blockIdx.x) + threadIdx.y) * Parameters::WarpBatch;
 
     // batch_size might not be a multiple of Parameters::WarpBatch. Check how
     // many batches have to computed within this WARP.
@@ -288,10 +288,10 @@ __global__ void softmax_warp_backward(output_t *gradInput, const input_t *grad, 
         local_batches = Parameters::WarpBatch;
 
     // there might be multiple batches per warp. compute the index within the batch
-    int local_idx = threadIdx.x;
+    int64_t local_idx = threadIdx.x;
 
     // the first element to process by the current thread
-    int thread_offset = first_batch * element_count + local_idx;
+    int64_t thread_offset = first_batch * element_count + local_idx;
     grad += thread_offset;
     output += thread_offset;
     gradInput += thread_offset;
