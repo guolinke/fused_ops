@@ -82,6 +82,25 @@ if torch.utils.cpp_extension.CUDA_HOME is None:
 
 check_cuda_torch_binary_vs_bare_metal(torch.utils.cpp_extension.CUDA_HOME)
 
+
+ext_modules.append(
+    CUDAExtension(name='multi_tensor',
+                    sources=['csrc/multi_tensor/interface.cpp',
+                            'csrc/multi_tensor/multi_tensor_l2norm_kernel.cu'],
+                    include_dirs=[os.path.join(this_dir, 'csrc')],
+                    extra_compile_args={'cxx': ['-O3'],
+                                        'nvcc':['-O3', '--use_fast_math',
+                                                '-gencode', 'arch=compute_70,code=sm_70',
+                                                '-gencode', 'arch=compute_80,code=sm_80',
+                                                '-U__CUDA_NO_HALF_OPERATORS__',
+                                                '-U__CUDA_NO_BFLOAT16_OPERATORS__',
+                                                '-U__CUDA_NO_HALF_CONVERSIONS__',
+                                                '-U__CUDA_NO_BFLOAT16_CONVERSIONS__',
+                                                '--expt-relaxed-constexpr',
+                                                '--expt-extended-lambda']
+                                        }))
+
+
 ext_modules.append(
     CUDAExtension(name='fused_xentropy_cuda',
                     sources=['csrc/xentropy/interface.cpp',
