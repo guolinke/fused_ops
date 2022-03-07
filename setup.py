@@ -170,6 +170,39 @@ ext_modules.append(
                                                 '--expt-relaxed-constexpr',
                                                 '--expt-extended-lambda'] + generator_flag}))
 
+
+ext_modules.append(
+    CUDAExtension(name='fused_rmsnorm_fast_cuda',
+                    sources=['csrc/rmsnorm/interface.cpp',
+                            'csrc/rmsnorm/rmsnorm.cu'],
+                    include_dirs=[os.path.join(this_dir, 'csrc')],
+                    extra_compile_args={'cxx': ['-O3',] + generator_flag,
+                                        'nvcc':['-O3', '--use_fast_math',
+                                                '-gencode', 'arch=compute_70,code=sm_70',
+                                                '-gencode', 'arch=compute_80,code=sm_80',
+                                                '-U__CUDA_NO_HALF_OPERATORS__',
+                                                '-U__CUDA_NO_BFLOAT16_OPERATORS__',
+                                                '-U__CUDA_NO_HALF_CONVERSIONS__',
+                                                '-U__CUDA_NO_BFLOAT16_CONVERSIONS__',
+                                                '--expt-relaxed-constexpr',
+                                                '--expt-extended-lambda'] + generator_flag}))
+
+ext_modules.append(
+    CUDAExtension(name='fused_rmsnorm_backward_gamma_cuda',
+                    sources=['csrc/rmsnorm/interface_gamma.cpp',
+                            'csrc/rmsnorm/rmsnorm_backward.cu'],
+                    include_dirs=[os.path.join(this_dir, 'csrc')],
+                    extra_compile_args={'cxx': ['-O3',] + generator_flag,
+                                        'nvcc':['-O3', '--use_fast_math', '-maxrregcount=50',
+                                                '-gencode', 'arch=compute_70,code=sm_70',
+                                                '-gencode', 'arch=compute_80,code=sm_80',
+                                                '-U__CUDA_NO_HALF_OPERATORS__',
+                                                '-U__CUDA_NO_BFLOAT16_OPERATORS__',
+                                                '-U__CUDA_NO_HALF_CONVERSIONS__',
+                                                '-U__CUDA_NO_BFLOAT16_CONVERSIONS__',
+                                                '--expt-relaxed-constexpr',
+                                                '--expt-extended-lambda'] + generator_flag}))
+
 ext_modules.append(
     CUDAExtension(name='fused_layernorm_fast_cuda',
                     sources=['csrc/layernorm/interface.cpp',
