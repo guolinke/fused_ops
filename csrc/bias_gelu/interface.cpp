@@ -1,6 +1,6 @@
 #include <torch/extension.h>
 #include <ATen/Generator.h>
-#include <ATen/CUDAGeneratorImpl.h>
+#include <ATen/cuda/CUDAGeneratorImpl.h>
 #include <vector>
 
 extern torch::Tensor (*bias_gelu_torch_forward_cuda)(const torch::Tensor &x, const torch::Tensor &bias);

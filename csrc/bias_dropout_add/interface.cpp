@@ -1,6 +1,6 @@
 #include <torch/extension.h>
 #include <ATen/Generator.h>
-#include <ATen/CUDAGeneratorImpl.h>
+#include <ATen/cuda/CUDAGeneratorImpl.h>
 #include <vector>
 
 std::vector<c10::optional<torch::Tensor>> bias_dropout_add_forward_cuda(const torch::Tensor &x,

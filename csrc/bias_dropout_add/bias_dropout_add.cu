@@ -1,6 +1,6 @@
 #include <vector>
 #include <ATen/ATen.h>
-#include <ATen/CUDAGeneratorImpl.h>
+#include <ATen/cuda/CUDAGeneratorImpl.h>
 #include <ATen/cuda/detail/IndexUtils.cuh>
 #include <ATen/cuda/detail/TensorInfo.cuh>
 #include <c10/cuda/CUDAMathCompat.h>
