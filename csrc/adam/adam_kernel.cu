@@ -7,7 +7,7 @@
 #include <cmath>
 #include "ATen/TensorUtils.h"
 #include "ATen/AccumulateType.h"
-#include <THC/THCGeneral.h>
+#include <ATen/cuda/Exceptions.h>
 
 #include "type_shim.h"
 
@@ -111,5 +111,5 @@ void fused_adam_cuda(
                     decay_size);
         );
     }
-    THCudaCheck(cudaGetLastError());
+    AT_CUDA_CHECK(cudaGetLastError());
 }

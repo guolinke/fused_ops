@@ -72,14 +72,9 @@
  */
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
-
+#include <ATen/cuda/Exceptions.h>
 #include <ATen/AccumulateType.h>
 #include <ATen/cuda/NumericLimits.cuh>
-
-#include <THC/THC.h>
-#include <THC/THCGeneral.h>
-#include <THC/THCThrustAllocator.cuh>
-
 #include "type_shim.h"
 
 #define ALIGN_BYTES 16
@@ -614,7 +609,7 @@ std::vector<Tensor> host_bf16_softmax_xentropy(
     }
   );
 
-  THCudaCheck(cudaGetLastError());
+  AT_CUDA_CHECK(cudaGetLastError());
 
   std::vector<at::Tensor> ret = {losses, max_log_sum_exp};
   return ret;
@@ -682,7 +677,7 @@ std::vector<Tensor> host_softmax_xentropy(
     }
   );
 
-  THCudaCheck(cudaGetLastError());
+  AT_CUDA_CHECK(cudaGetLastError());
 
   std::vector<at::Tensor> ret = {losses, max_log_sum_exp};
   return ret;
@@ -756,7 +751,7 @@ Tensor host_softmax_xentropy_backward(
     }
   );
 
-  THCudaCheck(cudaGetLastError());
+  AT_CUDA_CHECK(cudaGetLastError());
   return gI;
 }
 
