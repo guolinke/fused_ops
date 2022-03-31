@@ -6,4 +6,4 @@ try:
     del fused_softmax_dropout_fast_cuda
     del fused_softmax_dropout
 except ImportError as err:
-    print("cannot import kernels, please install the package")
+    print("cannot import softmax kernel, please install the package")

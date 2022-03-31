@@ -65,7 +65,7 @@ template <
     typename Parameters, bool NeedMask
 >
 __global__ void softmax_warp_forward(input_t *dst, input_t *dst_orig, const output_t *src,
-    typename Parameters::MaskType *mask, acc_t p, int batch_size, int element_count, uint64_t seed, uint64_t offset) {
+    typename Parameters::MaskType *mask, acc_t p, int batch_size, int element_count, uint64_t seed, uint64_t rand_offset) {
     using MaskType = typename Parameters::MaskType;
     curandStatePhilox4_32_10_t state;
     int64_t first_batch = (static_cast<int64_t>(blockDim.y) * static_cast<int64_t>(blockIdx.x) + threadIdx.y) * Parameters::WarpBatch;
@@ -73,7 +73,7 @@ __global__ void softmax_warp_forward(input_t *dst, input_t *dst_orig, const outp
     int64_t local_idx = threadIdx.x;
     const int64_t thread_offset = first_batch * element_count + local_idx;
     if IF_CONSTEXPR (NeedMask) {
-        curand_init(seed, thread_offset, offset, &state);
+        curand_init(seed, thread_offset, rand_offset, &state);
     }
  
     // batch_size might not be a multiple of Parameters::WarpBatch. Check how

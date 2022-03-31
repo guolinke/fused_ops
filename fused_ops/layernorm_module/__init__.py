@@ -8,4 +8,4 @@ try:
     del fused_layernorm_backward_gamma_beta_cuda
     del fused_layer_norm
 except ImportError as err:
-    print("cannot import kernels, please install the package")
+    print("cannot import layernorm kernel, please install the package")

@@ -82,6 +82,26 @@ if torch.utils.cpp_extension.CUDA_HOME is None:
 
 check_cuda_torch_binary_vs_bare_metal(torch.utils.cpp_extension.CUDA_HOME)
 
+generator_flag = []
+torch_dir = torch.__path__[0]
+if os.path.exists(os.path.join(torch_dir, 'include', 'ATen', 'CUDAGenerator.h')):
+    generator_flag = ['-DOLD_GENERATOR']
+
+ext_modules.append(
+CUDAExtension(name='fused_rounding',
+                sources=['csrc/rounding/interface.cpp',
+                        'csrc/rounding/fp32_to_bf16.cu'],
+                include_dirs=[os.path.join(this_dir, 'csrc')],
+                extra_compile_args={'cxx': ['-O3',] + generator_flag,
+                                        'nvcc':['-O3', '--use_fast_math', 
+                                                '-gencode', 'arch=compute_70,code=sm_70',
+                                                '-gencode', 'arch=compute_80,code=sm_80',
+                                                '-U__CUDA_NO_HALF_OPERATORS__',
+                                                '-U__CUDA_NO_BFLOAT16_OPERATORS__',
+                                                '-U__CUDA_NO_HALF_CONVERSIONS__',
+                                                '-U__CUDA_NO_BFLOAT16_CONVERSIONS__',
+                                                '--expt-relaxed-constexpr',
+                                                '--expt-extended-lambda'] + generator_flag}))
 
 ext_modules.append(
     CUDAExtension(name='multi_tensor',
@@ -102,11 +122,11 @@ ext_modules.append(
 
 
 ext_modules.append(
-    CUDAExtension(name='fused_xentropy_cuda',
-                    sources=['csrc/xentropy/interface.cpp',
-                            'csrc/xentropy/xentropy_kernel.cu'],
-                    include_dirs=[os.path.join(this_dir, 'csrc')],
-                    extra_compile_args={'cxx': ['-O3'],
+CUDAExtension(name='fused_xentropy_cuda',
+                sources=['csrc/xentropy/interface.cpp',
+                        'csrc/xentropy/xentropy_kernel.cu'],
+                include_dirs=[os.path.join(this_dir, 'csrc')],
+                extra_compile_args={'cxx': ['-O3'],
                                         'nvcc':['-O3']}))
 
 ext_modules.append(
@@ -117,11 +137,6 @@ ext_modules.append(
                     extra_compile_args={'cxx': ['-O3'],
                                         'nvcc':['-O3', '--use_fast_math']}))
 
-generator_flag = []
-torch_dir = torch.__path__[0]
-if os.path.exists(os.path.join(torch_dir, 'include', 'ATen', 'CUDAGenerator.h')):
-    generator_flag = ['-DOLD_GENERATOR']
-
 ext_modules.append(
     CUDAExtension(name='fused_softmax_dropout_fast_cuda',
                     sources=['csrc/softmax_dropout/interface.cpp',
@@ -129,38 +144,6 @@ ext_modules.append(
                     include_dirs=[os.path.join(this_dir, 'csrc')],
                     extra_compile_args={'cxx': ['-O3',] + generator_flag,
                                         'nvcc':['-O3', '--use_fast_math',
-                                                '-gencode', 'arch=compute_70,code=sm_70',
-                                                '-gencode', 'arch=compute_80,code=sm_80',
-                                                '-U__CUDA_NO_HALF_OPERATORS__',
-                                                '-U__CUDA_NO_BFLOAT16_OPERATORS__',
-                                                '-U__CUDA_NO_HALF_CONVERSIONS__',
-                                                '-U__CUDA_NO_BFLOAT16_CONVERSIONS__',
-                                                '--expt-relaxed-constexpr',
-                                                '--expt-extended-lambda'] + generator_flag}))
-
-ext_modules.append(
-    CUDAExtension(name='fused_bias_gelu_cuda',
-                    sources=['csrc/bias_gelu/interface.cpp',
-                            'csrc/bias_gelu/bias_gelu.cu'],
-                    include_dirs=[os.path.join(this_dir, 'csrc')],
-                    extra_compile_args={'cxx': ['-O3',] + generator_flag,
-                                        'nvcc':['-O3', '--use_fast_math', 
-                                                '-gencode', 'arch=compute_70,code=sm_70',
-                                                '-gencode', 'arch=compute_80,code=sm_80',
-                                                '-U__CUDA_NO_HALF_OPERATORS__',
-                                                '-U__CUDA_NO_BFLOAT16_OPERATORS__',
-                                                '-U__CUDA_NO_HALF_CONVERSIONS__',
-                                                '-U__CUDA_NO_BFLOAT16_CONVERSIONS__',
-                                                '--expt-relaxed-constexpr',
-                                                '--expt-extended-lambda'] + generator_flag}))
-
-ext_modules.append(
-    CUDAExtension(name='fused_bias_dropout_add_cuda',
-                    sources=['csrc/bias_dropout_add/interface.cpp',
-                            'csrc/bias_dropout_add/bias_dropout_add.cu'],
-                    include_dirs=[os.path.join(this_dir, 'csrc')],
-                    extra_compile_args={'cxx': ['-O3',] + generator_flag,
-                                        'nvcc':['-O3', '--use_fast_math', 
                                                 '-gencode', 'arch=compute_70,code=sm_70',
                                                 '-gencode', 'arch=compute_80,code=sm_80',
                                                 '-U__CUDA_NO_HALF_OPERATORS__',

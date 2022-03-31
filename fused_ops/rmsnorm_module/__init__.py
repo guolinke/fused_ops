@@ -8,4 +8,4 @@ try:
     del fused_rmsnorm_backward_gamma_cuda
 except ImportError as err:
     print(err)
-    print("cannot import kernels, please install the package")
+    print("cannot import rmsnorm kernel, please install the package")
